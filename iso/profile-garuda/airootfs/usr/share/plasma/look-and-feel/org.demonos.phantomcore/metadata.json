@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [
+            { "Name": "Ko Kannadian (DemonOS PhantomCore)" }
+        ],
+        "Category": "",
+        "Description": "DemonOS PhantomCore: Garuda Dr460nized panels, dock, Kvantum and Sweet window decorations with DemonOS colours, wallpaper and splash. Panel/dock layout comes from Garuda's org.garuda.desktop.* layout templates (garuda-dr460nized, GPL-3.0-or-later).",
+        "EnabledByDefault": true,
+        "Id": "org.demonos.phantomcore",
+        "License": "GPL-3.0-or-later",
+        "Name": "DemonOS PhantomCore (Dr460nized base)",
+        "Version": "1.0",
+        "Website": "https://github.com/kokannadian-killa/Demon-AI-QuantumSec-BioTek-Engine"
+    },
+    "X-Plasma-APIVersion": "2"
+}
