@@ -19,6 +19,10 @@ Notes:
 - The ISO boot tests ran under QEMU software emulation (TCG) only, not on real hardware.
 - The CI badge below still points at the original Lillith-Desktop-Avatar repository.
 
+Roadmap:
+
+- Next: rebase the ISO on Garuda Linux Dragonized (KDE) with full DemonOS PhantomCore rebranding (in progress). The current ISO profile is based on Arch Linux archiso (releng) with KDE Plasma; it is not Garuda-based yet.
+
 ---
 
 <div align="center">
