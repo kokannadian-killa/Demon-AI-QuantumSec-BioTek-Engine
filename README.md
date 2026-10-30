@@ -1,3 +1,26 @@
+# Demon-AI-QuantumSec-BioTek-Engine
+
+This repository is **Demon-AI-QuantumSec-BioTek-Engine**, a standalone snapshot of the completed
+Lillith OS + QuantumSec system. It was built from
+[kokannadian-killa/Lillith-Desktop-Avatar](https://github.com/kokannadian-killa/Lillith-Desktop-Avatar)
+at commit `1d2ecba` (branch `release/demonos-phantomcore-2026.10.30`).
+
+What it contains:
+
+- **The original Lillith desktop avatar**, with nothing removed, plus Dream learning and the Bots tab.
+- **QuantumSec**: `crates/lillith-quantumsec`, the blood-seal consent dialog, and the systemd units in `linux/systemd/`.
+- **The Biotek rename**: the data home is `~/.biotek`; see `docs/BIOTEK_TERMINOLOGY_MAP.md`.
+- **The DemonOS PhantomCore ISO profile**: `iso/`, with `iso/build-iso.sh` and `iso/test-boot.sh`.
+- **The handover**: `docs/HANDOVER.md` (launch, test and rebuild commands, boot proof, limitations).
+
+Notes:
+
+- The built ISO itself (about 4.2 GB) is not stored in git. Rebuild it with `iso/build-iso.sh`.
+- The ISO boot tests ran under QEMU software emulation (TCG) only, not on real hardware.
+- The CI badge below still points at the original Lillith-Desktop-Avatar repository.
+
+---
+
 <div align="center">
 
 # Lillith — Desktop Companion & System Monitor
