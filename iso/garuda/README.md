@@ -103,13 +103,18 @@ nohup iso/garuda/build-garuda-iso.sh > build-garuda.out 2>&1 &
    * `mksquashfs-stream.sh` is put first on `PATH` (as `mksquashfs`). It streams the airootfs as a POSIX tar (with xattrs/ACLs/numeric owners, so file capabilities survive) into `sqfstar`, deleting files once they are in the stream, and then checks that the image has exactly as many entries as the source had.
    * `work/` is removed at the end.
 
-## Result (2026-10-30)
+## Result (2026-10-30, build 3, current)
 
-* `demonos-phantomcore-garuda-2026.10.30-x86_64.iso`
+* `demonos-phantomcore-garuda-2026.10.31-x86_64.iso` (the date in the name is the chroot's UTC date; built 19:24 MDT 2026-10-30 from `6e60a19`)
 * 5,753,348,096 bytes (5.4 GiB)
-* sha256 `aa6606ecfeb71aea4f4d45761d6913c46931106b5a6bb4b84ed289c8b3e282a7`
-* built 18:04 MDT
+* sha256 `a4ad54b38899c40aed58e37d2755a6dc263990ef9a42815d71de14f7e962da05`
 * airootfs.sfs is 5.44 GB, so it is a multi-extent ISO 9660 file (ISO level 3, which Linux reads fine)
-* the lowest free disk during the build was 3956 MB
+* lowest free disk during the build: 4047 MB (package cache on tmpfs)
+* boot tests: BIOS 31/31 and UEFI 31/31 guest checks PASS (see "Garuda boot proof" in `docs/HANDOVER.md`)
 
-Boot-test results: see "Garuda boot proof" in `docs/HANDOVER.md`.
+### Earlier builds (replaced)
+
+| build | result | what was wrong / fixed |
+|---|---|---|
+| 1 (18:04 MDT, `df573f5`), sha256 `aa6606ec…82a7` | UEFI 27/30, BIOS 28/31 | All Garuda-base checks passed, but the live user's Plasma config stayed Garuda's: mkarchiso copies `/etc/skel` into existing homes with `cp --update=none` *after* the DemonOS hook, and Garuda's skel had already filled `/home/demon/.config` (Dr460nized LnF, Autolock on). Fixed in `6c32246`: `demonos-rebrand` also brands every not-yet-initialised home. The fastfetch check regex was also fixed to match fastfetch's real output (`" OS DemonOS PhantomCore"`, icon-prefixed key, no colon); it still requires the DemonOS OS line. The GRUB label was shortened (it was truncated). |
+| 2 (18:55 MDT, `6c32246`) | failed | **Disk full during pacstrap**, not a broken pacstrap: pacman downloaded ~2.7 GB, then installed 9.5 GB, and the per-package cache watcher fell minutes behind, so free disk fell to 906 MB. The low-disk watcher then stopped only processes rooted in the build chroot; mkarchiso's pacman is chrooted one level deeper (`work/x86_64/airootfs`), so it kept running hooks while the host cleanup trap removed `work/` under it: every later hook said `call to execv failed (No such file or directory)`. Fixed in `dbe920e`/`6e60a19`: package cache on a 5000 MB tmpfs (`PKGCACHE_TMPFS_MB`, 0 = on disk), one-pass cache watcher every 3 s, stop processes rooted in the chroot *or below it* (TERM then KILL), and cleanup lazily unmounts everything under `work/`, refuses to delete while anything is still mounted there and uses `rm --one-file-system`. |

@@ -228,6 +228,29 @@ The Resource Load proton (`crates/lillith-quantumsec/src/proton.rs`, `poll_resou
 
 Any Alert makes the overall status **CRITICAL**. In a QEMU/TCG guest the emulated CPUs run at about 100% while Plasma starts, so the shield shows `STATUS CRITICAL … cpu=100%` for the first minutes, then ELEVATED (cpu≈81%). That is the threshold working as designed on an overloaded VM; on real hardware it settles to normal. The File Integrity notice ("2 missing") comes from watched config files that a fresh live user doesn't have yet.
 
+## Garuda Dr460nized base (`iso/profile-garuda`)
+
+A second profile, `iso/profile-garuda`, builds the same DemonOS PhantomCore system
+on **Garuda Linux Dr460nized (KDE)**: Garuda's real `[garuda]` and `[chaotic-aur]`
+repos (Chaotic-AUR key `EF925EA60F33D0CB85C44AD13056513887B78AEB`), Garuda's
+Dr460nized package list (iso-profiles `760f824c`), the `linux-garuda` kernel and
+Garuda's Dr460nized panel and dock, with DemonOS branding over os-release/lsb,
+GRUB, Plymouth, SDDM, the Plasma look-and-feel, wallpaper and fastfetch. Lillith,
+QuantumSec and BioTek ship unchanged (the verified lillith package, mtree-checked).
+This profile (`iso/profile`) and its ISO are unchanged.
+
+```sh
+nohup iso/garuda/build-garuda-iso.sh > build-garuda.out 2>&1 &
+EXPECT_GARUDA=1 MEM=4096 iso/test-boot.sh out/demonos-phantomcore-garuda-*.iso bios 3000   # then uefi
+```
+
+`EXPECT_GARUDA=1` makes `guest-check.py` add 14 checks (Garuda packages and repos,
+running `linux-garuda`, os-release, lsb-release, SDDM, Plymouth, Plasma LnF and
+colours, wallpaper, Dr460nized panel + dock with the DemonOS start icon and Lillith
+pinned, fastfetch, GRUB defaults, SDDM greeter render). Approach, sources,
+exclusions, the trademark replacement table, licenses and the build history are in
+`iso/garuda/README.md`.
+
 ## Build history
 
 | date (MDT) | lillith | ISO sha256 | notes |
@@ -235,6 +258,7 @@ Any Alert makes the overall status **CRITICAL**. In a QEMU/TCG guest the emulate
 | 2026-10-30 06:06 | 20dee27 | `6411be1f73ff05df0900d380091375358cf37a476664a97ab22a5ccf27dfdaff` | first build; UEFI + BIOS reached the desktop; display blanked after ~10 min; LLMNR on; units pointed at `~/.local/bin`. Replaced by the next build (deleted for disk). |
 | 2026-10-30 07:56 | 20dee27 + unit drop-ins (bb50f4f) | `5ce04e868167a1265f5630f918c6982a259b3c5b82ed8fd3d8c8c2b29a704df3` | UEFI and BIOS TCG boot tests: every guest check passed, but mDNS was still on and the image had no Dream learning / Bots tab. Replaced by the next build (deleted). |
 | 2026-10-30 09:40 | integration 9270fa6 (main 07a7e9f merged: Dream learning, Bots tab) | `4ef75a435173afefd7c555691cdb0965843d8a0d270db88149dc6b0021751fe5` | current. 4,185,948,160 bytes. UEFI and BIOS TCG boot tests: every guest check passes. That includes mDNS and LLMNR off, the Dream learning strings in `/usr/bin/lillith`, and `lillith-settings --tab bots` showing the Bots tab (`shot-bots-tab.png`). |
+| 2026-10-30 19:24 | same lillith package (repacked, mtree-checked), Garuda profile `6e60a19` | `a4ad54b38899c40aed58e37d2755a6dc263990ef9a42815d71de14f7e962da05` | **Garuda Dr460nized base** (`iso/profile-garuda`, `demonos-phantomcore-garuda-2026.10.31-x86_64.iso`, 5,753,348,096 bytes). BIOS 31/31 and UEFI 31/31 guest checks (the 17 DemonOS checks plus the Garuda-base and branding checks). The Arch ISO above is kept. See `iso/garuda/README.md`. |
 
 ## Known limits
 

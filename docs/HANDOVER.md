@@ -368,6 +368,31 @@ The paths used on the build box were:
   * local model (qwen2.5-0.5b, llama-server) answers on `127.0.0.1:8080` and is bound to loopback only.
 * In the first UEFI run, 16 of 17 passed. Only the Bots-tab launch failed, because of the harness's wrong Wayland socket name.
 
+## 6a. Garuda boot proof (2026-10-30)
+
+The Garuda Dr460nized-based ISO (`iso/profile-garuda`, details in `iso/garuda/README.md`):
+
+* **ISO:** `demonos-phantomcore-garuda-2026.10.31-x86_64.iso`
+  * 5,753,348,096 bytes (5.4 GiB)
+  * sha256 `a4ad54b38899c40aed58e37d2755a6dc263990ef9a42815d71de14f7e962da05`
+  * built 19:24 MDT from `garuda/dragonized-rebase` @ `6e60a19`; on the build box at `/workspace/qsec/iso-build/out/`
+  * 1313 packages from `[garuda]`, `[chaotic-aur]`, `[core]`, `[extra]`, `[multilib]` and `[demonos-local]` (lillith, lillith-llama-bin); kernel `linux-garuda`
+* **Boot tests:** QEMU **TCG** (never KVM), 4 GiB file-backed RAM, 4 vCPU, virtio-gpu, `EXPECT_GARUDA=1`, in `/workspace/qsec/iso-build/boot-test/garuda3-20261030-192727/{bios,uefi}/`:
+  * **BIOS (SeaBIOS): 31/31 PASS**
+  * **UEFI (OVMF): 31/31 PASS**
+  * the 31 checks are the 17 DemonOS checks above plus the Garuda-base and branding checks: Garuda packages installed, `[garuda]` + `[chaotic-aur]` configured, running kernel `linux-garuda`, os-release `NAME="DemonOS PhantomCore"` / `ID=demonos` / `ID_LIKE="garuda arch"`, lsb-release `DISTRIB_ID=DemonOS`, SDDM theme `demonos`, Plymouth `demonos`, Plasma LnF `org.demonos.phantomcore` + DemonOS colours, DemonOS wallpaper, Dr460nized panel + dock with the DemonOS start icon and Lillith pinned, fastfetch DemonOS logo + OS line, GRUB defaults, file capabilities, SDDM DemonOS greeter render.
+
+| Stage | BIOS | UEFI |
+|---|---|---|
+| Boot menu (syslinux / GRUB, DemonOS theme) | `bios/shot-0001-6s.png` | `uefi/shot-0002-12s.png` |
+| Plymouth "AWAKENING THE CORE" | `bios/shot-0006-36s.png` | `uefi/shot-0006-36s.png` |
+| SDDM DemonOS greeter (test mode; autologin skips it at boot) | `bios/shot-sddm-demonos-theme.png` | `uefi/shot-sddm-demonos-theme.png` |
+| Desktop with Lillith, QuantumSec awakening dialog, Dr460nized top panel | `bios/shot-desktop-lillith.png` | `uefi/shot-desktop-lillith.png` |
+| Bots tab | `bios/shot-bots-tab.png` | `uefi/shot-bots-tab.png` |
+| Desktop still live | `bios/shot-0044-1020s.png` = SCREEN-LIVE | `uefi/shot-0044-1020s.png` = SCREEN-LIVE |
+
+* Earlier Garuda builds are listed in `iso/garuda/README.md` (build 1: 27/30 UEFI, 28/31 BIOS, per-user Plasma config left Garuda's; build 2: disk full during pacstrap). Both were fixed, and none of the checks was relaxed.
+
 ## 7. Known limitations
 
 * **STATUS CRITICAL on VMs.** Under QEMU TCG the CPU is pinned at about 100%, so Resource Load ≥ 90% raises an Alert. This is expected and the thresholds were not changed (§2).
