@@ -76,7 +76,7 @@ PY
 ls -la "$A/usr/share/icons/demonos" "$L/splash/images"
 
 log "4/4 mkarchiso ($(free_mb) MB free)"
-rm -rf /build/work
+rm -rf --one-file-system /build/work
 SHIM=/build/shim; rm -rf "$SHIM"; install -d "$SHIM"
 install -m 755 "$SRC/iso/garuda/mksquashfs-stream.sh" "$SHIM/mksquashfs"
 export DEMONOS_SQFS_STREAM=1 PATH="$SHIM:$PATH"
@@ -85,25 +85,27 @@ mk_pid=$!
 # Free the download cache while pacstrap runs: a package file can go once its
 # local-db entry exists in the airootfs (pacman writes it after extracting).
 ( LDB=/build/work/x86_64/airootfs/var/lib/pacman/local; n=0
+  # One pass per cache file (not one glob per installed package, which fell
+  # minutes behind pacman in build 2): a file name-ver-rel-arch.pkg.tar.zst can go
+  # once local/name-ver-rel/files exists in the airootfs.
   while kill -0 "$mk_pid" 2>/dev/null; do
     if [[ -d "$LDB" ]]; then
-      for d in "$LDB"/*/; do
-        [[ -f "$d/files" ]] || continue
-        nv=$(basename "$d")
-        for f in "$PKGCACHE/$nv"-*.pkg.tar.zst "$REPO/$nv"-*.pkg.tar.zst; do
-          [[ -e "$f" ]] || continue
-          rm -f "$f" "$f.sig"; n=$((n+1))
-        done
+      for f in "$PKGCACHE"/*.pkg.tar.zst "$REPO"/*.pkg.tar.zst; do
+        [[ -e "$f" ]] || continue
+        b=${f##*/}; nv=${b%-*.pkg.tar.zst}
+        [[ -f "$LDB/$nv/files" ]] || continue
+        rm -f "$f" "$f.sig"; n=$((n+1))
       done
     fi
     if pgrep -x sqfstar >/dev/null || pgrep -x mksquashfs >/dev/null; then
       rm -f "$PKGCACHE"/*.pkg.tar.* "$REPO"/*.pkg.tar.* 2>/dev/null
       echo "[cache-watch] squashfs started; package cache emptied ($n removed during pacstrap); $(free_mb) MB free"; break
     fi
-    sleep 10
+    sleep 3
   done ) &
 rc=0; wait "$mk_pid" || rc=$?
-rm -rf /build/work "$SHIM"
+for m in $(findmnt -rn -o TARGET | grep -E "^/build/work(/|$)" | sort -r); do umount -l "$m"; done
+rm -rf --one-file-system /build/work "$SHIM"
 log "mkarchiso exit $rc; $(free_mb) MB free"
 ls -la /build/out
 exit $rc
