@@ -17,7 +17,7 @@ ROOT="${ARCH_ROOT:-/workspace/qsec/arch-root/root.x86_64}"
 MODEL="${DEMONOS_MODEL:-/workspace/models/qwen2.5-0.5b-instruct-q4_k_m.gguf}"
 ABORT_FREE_MB="${ABORT_FREE_MB:-1500}"
 MIN_START_FREE_MB="${MIN_START_FREE_MB:-9000}"
-PKGCACHE_TMPFS_MB="${PKGCACHE_TMPFS_MB:-3500}"   # 0 = keep the cache on disk
+PKGCACHE_TMPFS_MB="${PKGCACHE_TMPFS_MB:-5000}"   # whole package set is ~4.3 GB; 0 = keep the cache on disk
 TS="$(date +%Y%m%d-%H%M%S)"
 LOG="$BUILD/logs/build-garuda-iso-$TS.log"
 mkdir -p "$BUILD/logs" "$BUILD/out"
@@ -88,7 +88,7 @@ mountpoint -q "$ROOT/build" || sudo mount --bind "$BUILD" "$ROOT/build"
 sudo mkdir -p "$ROOT/build/src"
 mountpoint -q "$ROOT/build/src" || { sudo mount --bind "$REPO" "$ROOT/build/src" && sudo mount -o remount,bind,ro "$ROOT/build/src"; }
 # Package download cache in RAM (tmpfs, ${PKGCACHE_TMPFS_MB} MB cap) instead of on
-# the disk: pacman downloads the whole set (~2.7 GB) before it installs ~9.5 GB,
+# the disk: pacman downloads the whole set (~4.3 GB) before it installs ~9.5 GB,
 # which ran build 2 into the low-disk stop. Already-downloaded packages are moved in.
 if [[ "${PKGCACHE_TMPFS_MB}" != 0 ]] && ! mountpoint -q "$ROOT/build/pkgcache"; then
   # set the on-disk files aside first (mount propagation may show the tmpfs at
