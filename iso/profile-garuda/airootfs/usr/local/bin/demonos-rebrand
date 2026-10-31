@@ -98,34 +98,50 @@ if [[ -f /usr/share/fastfetch/presets/dr460nized.jsonc ]]; then
     /usr/share/fastfetch/presets/dr460nized.jsonc > /usr/share/fastfetch/presets/demonos.jsonc
 fi
 
-# 4. Desktop defaults for new users (/etc/skel; the live user is copied from it at boot)
-if [[ -d "$SKEL" ]]; then
-  for f in kdeglobals kscreenlockerrc fish/config.fish autostart/setup-assistant.desktop; do keep_orig "$SKEL/$f"; done
-  # Plasma look-and-feel: DemonOS package (Dr460nized panels/dock + DemonOS colours/wallpaper/splash)
-  kset "$SKEL/kdeglobals" KDE LookAndFeelPackage "$LNF"
-  kset "$SKEL/kdeglobals" General ColorScheme DemonOS
-  kset "$SKEL/kdeglobals" KDE ColorScheme DemonOS
-  kset "$SKEL/kdeglobals" KDE widgetStyle kvantum-dark
-  kset "$SKEL/kdeglobals" Icons Theme BeautyLine
-  kset "$SKEL/ksplashrc" KSplash Theme "$LNF"
-  kset "$SKEL/ksplashrc" KSplash Engine KSplashQML
+# 4. Desktop defaults for new users (/etc/skel) and for accounts that have not
+#    started Plasma yet. Some homes already exist before mkarchiso's
+#    "copy /etc/skel to user homes" step, and that step never overwrites files,
+#    so the live user's home would keep Garuda's kdeglobals (LookAndFeel
+#    Dr460nized). A home that already has a Plasma desktop layout
+#    (plasma-org.kde.plasma.desktop-appletsrc) belongs to someone who has logged
+#    in, so it is left alone.
+brand_cfg() {   # $1 = a .config directory
+  local C=$1
+  kset "$C/kdeglobals" KDE LookAndFeelPackage "$LNF"
+  kset "$C/kdeglobals" General ColorScheme DemonOS
+  kset "$C/kdeglobals" KDE ColorScheme DemonOS
+  kset "$C/kdeglobals" KDE widgetStyle kvantum-dark
+  kset "$C/kdeglobals" Icons Theme BeautyLine
+  kset "$C/ksplashrc" KSplash Theme "$LNF"
+  kset "$C/ksplashrc" KSplash Engine KSplashQML
   # live session: no auto-lock; DemonOS lock-screen wallpaper (was Garuda's Maldrakor)
-  kset "$SKEL/kscreenlockerrc" Daemon Autolock false
-  kset "$SKEL/kscreenlockerrc" Daemon LockOnResume false
-  kset "$SKEL/kscreenlockerrc" "Greeter][Wallpaper][org.kde.image][General" Image "file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png"
-  kset "$SKEL/kscreenlockerrc" "Greeter][Wallpaper][org.kde.image][General" PreviewImage "file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png"
+  kset "$C/kscreenlockerrc" Daemon Autolock false
+  kset "$C/kscreenlockerrc" Daemon LockOnResume false
+  kset "$C/kscreenlockerrc" "Greeter][Wallpaper][org.kde.image][General" Image "file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png"
+  kset "$C/kscreenlockerrc" "Greeter][Wallpaper][org.kde.image][General" PreviewImage "file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png"
   # fish: keep Garuda's config, add the DemonOS greeting + fastfetch preset
-  if [[ -f "$SKEL/fish/config.fish" ]] && ! grep -q 'demonos.fish' "$SKEL/fish/config.fish"; then
-    sed -i '\|^source /usr/share/garuda/garuda-fish-config/config.fish|a source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish # DemonOS PhantomCore additions' "$SKEL/fish/config.fish"
-    grep -q 'demonos.fish' "$SKEL/fish/config.fish" || echo 'source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish # DemonOS PhantomCore additions' >> "$SKEL/fish/config.fish"
-  elif [[ ! -f "$SKEL/fish/config.fish" ]]; then
-    install -D -m 0644 /dev/null "$SKEL/fish/config.fish"
-    echo 'source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish' > "$SKEL/fish/config.fish"
+  if [[ -f "$C/fish/config.fish" ]] && ! grep -q 'demonos.fish' "$C/fish/config.fish"; then
+    sed -i '\|^source /usr/share/garuda/garuda-fish-config/config.fish|a source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish # DemonOS PhantomCore additions' "$C/fish/config.fish"
+    grep -q 'demonos.fish' "$C/fish/config.fish" || echo 'source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish # DemonOS PhantomCore additions' >> "$C/fish/config.fish"
+  elif [[ ! -f "$C/fish/config.fish" ]]; then
+    install -D -m 0644 /dev/null "$C/fish/config.fish"
+    echo 'source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish' > "$C/fish/config.fish"
   fi
   # Garuda's Setup Assistant installs software over the network on first login;
   # on the DemonOS live medium the Lillith awakening dialog is the first-run flow.
-  rm -f "$SKEL/autostart/setup-assistant.desktop"
+  rm -f "$C/autostart/setup-assistant.desktop"
+}
+if [[ -d "$SKEL" ]]; then
+  for f in kdeglobals kscreenlockerrc fish/config.fish autostart/setup-assistant.desktop; do keep_orig "$SKEL/$f"; done
+  brand_cfg "$SKEL"
 fi
+while IFS=: read -r _u _ uid gid _ home _; do
+  (( uid >= 1000 && uid < 60000 )) || continue
+  [[ -n "$home" && "$home" != / && -d "$home/.config" ]] || continue
+  [[ -e "$home/.config/plasma-org.kde.plasma.desktop-appletsrc" ]] && continue
+  brand_cfg "$home/.config"
+  chown -R "$uid:$gid" "$home/.config" 2>/dev/null || true
+done < /etc/passwd
 # 5. Garuda repos stay enabled (garuda-config-agent's pacman.yaml normally adds them;
 #    this is only a fallback so the base can be updated from Garuda/Chaotic-AUR)
 PC=/etc/pacman.conf
