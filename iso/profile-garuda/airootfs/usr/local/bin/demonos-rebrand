@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# demonos-rebrand -- make DemonOS PhantomCore branding win over the Garuda base.
+#
+# Run by /usr/share/libalpm/hooks/zzzz50-demonos-branding.hook after every pacman
+# transaction (so also once at ISO build time, inside mkarchiso's pacstrap).
+# Idempotent. Additive: Garuda's packages, repos ([garuda], [chaotic-aur]), Dr460nized
+# layout, Kvantum/aurorae themes and tools stay; only names, logos, colours and the
+# wallpaper are DemonOS. Garuda's originals are kept under /usr/share/demonos/garuda-originals.
+set -u
+ORIG=/usr/share/demonos/garuda-originals
+OVR=/usr/share/demonos/skel-overrides
+SKEL=/etc/skel/.config
+LNF=org.demonos.phantomcore
+REPO_URL="https://github.com/kokannadian-killa/Demon-AI-QuantumSec-BioTek-Engine"
+mkdir -p "$ORIG"
+
+keep_orig(){ # $1 = file; save Garuda's version once
+  [[ -e "$1" && ! -e "$ORIG$1" ]] && install -D -m 0644 "$1" "$ORIG$1"
+  return 0
+}
+
+# kconfig-style "key=value" setter for one [Group] (groups like [AC][Display] are fine)
+kset(){ # file group key value
+  python3 - "$@" <<'PY'
+import sys, re, os
+path, group, key, val = sys.argv[1:5]
+lines = open(path).read().splitlines() if os.path.exists(path) else []
+hdr = "[" + group + "]"
+out, i, in_g, done, seen = [], 0, False, False, False
+for ln in lines:
+    if ln.startswith("["):
+        if in_g and not done:
+            j = len(out)
+            while j > 0 and not out[j-1].strip(): j -= 1
+            out.insert(j, f"{key}={val}"); done = True
+        in_g = (ln.strip() == hdr); seen = seen or in_g
+    elif in_g and re.match(rf"^{re.escape(key)}(\[[^\]]*\])?\s*=", ln):
+        if not done:
+            out.append(f"{key}={val}"); done = True
+        continue
+    out.append(ln)
+if in_g and not done:
+    out.append(f"{key}={val}"); done = True
+if not seen:
+    if out and out[-1].strip(): out.append("")
+    out += [hdr, f"{key}={val}"]
+os.makedirs(os.path.dirname(path), exist_ok=True)
+open(path, "w").write("\n".join(out) + "\n")
+PY
+}
+
+# 1. os-release / lsb-release / issue (garuda-hooks rewrites these to "Garuda")
+keep_orig /usr/lib/os-release
+cat > /usr/lib/os-release <<OSR
+NAME="DemonOS PhantomCore"
+PRETTY_NAME="DemonOS PhantomCore (Garuda Linux Dr460nized base)"
+ID=demonos
+ID_LIKE="garuda arch"
+BUILD_ID=rolling
+VARIANT="Demon-AI-QuantumSec-BioTek-Engine"
+VARIANT_ID=phantomcore
+ANSI_COLOR="38;2;255;45;85"
+HOME_URL="$REPO_URL"
+DOCUMENTATION_URL="$REPO_URL/blob/main/iso/README.md"
+SUPPORT_URL="$REPO_URL/issues"
+BUG_REPORT_URL="$REPO_URL/issues"
+LOGO=demonos
+OSR
+[[ -L /etc/os-release || ! -e /etc/os-release ]] && ln -sf ../usr/lib/os-release /etc/os-release
+keep_orig /etc/lsb-release
+cat > /etc/lsb-release <<'LSB'
+DISTRIB_ID=DemonOS
+DISTRIB_RELEASE=rolling
+DISTRIB_CODENAME=PhantomCore
+DISTRIB_DESCRIPTION="DemonOS PhantomCore (Garuda Linux Dr460nized base)"
+LSB
+for f in /etc/issue /usr/share/factory/etc/issue; do
+  [[ -e "$f" ]] || continue
+  keep_orig "$f"
+  printf 'DemonOS PhantomCore \\r (\\l)  --  Lillith OS + QuantumSec + BioTek\n\n' > "$f"
+done
+
+# 2. GRUB defaults for an installed system (garuda-config-agent sets the Garuda theme)
+if [[ -f /etc/default/grub ]]; then
+  sed -i -e 's|^GRUB_DISTRIBUTOR=.*|GRUB_DISTRIBUTOR="DemonOS"|' /etc/default/grub
+  if [[ -f /usr/share/grub/themes/demonos/theme.txt ]]; then
+    if grep -q '^GRUB_THEME=' /etc/default/grub; then
+      sed -i 's|^GRUB_THEME=.*|GRUB_THEME="/usr/share/grub/themes/demonos/theme.txt"|' /etc/default/grub
+    else
+      echo 'GRUB_THEME="/usr/share/grub/themes/demonos/theme.txt"' >> /etc/default/grub
+    fi
+  fi
+fi
+
+# 3. fastfetch: DemonOS preset = Garuda's Dr460nized module list with the DemonOS logo
+if [[ -f /usr/share/fastfetch/presets/dr460nized.jsonc ]]; then
+  sed 's|/usr/share/icons/garuda/dr460nized-fastfetch.png|/usr/share/icons/demonos/demonos-fastfetch.png|' \
+    /usr/share/fastfetch/presets/dr460nized.jsonc > /usr/share/fastfetch/presets/demonos.jsonc
+fi
+
+# 4. Desktop defaults for new users (/etc/skel) and for accounts that have not
+#    started Plasma yet. Some homes already exist before mkarchiso's
+#    "copy /etc/skel to user homes" step, and that step never overwrites files,
+#    so the live user's home would keep Garuda's kdeglobals (LookAndFeel
+#    Dr460nized). A home that already has a Plasma desktop layout
+#    (plasma-org.kde.plasma.desktop-appletsrc) belongs to someone who has logged
+#    in, so it is left alone.
+brand_cfg() {   # $1 = a .config directory
+  local C=$1
+  kset "$C/kdeglobals" KDE LookAndFeelPackage "$LNF"
+  kset "$C/kdeglobals" General ColorScheme DemonOS
+  kset "$C/kdeglobals" KDE ColorScheme DemonOS
+  kset "$C/kdeglobals" KDE widgetStyle kvantum-dark
+  kset "$C/kdeglobals" Icons Theme BeautyLine
+  kset "$C/ksplashrc" KSplash Theme "$LNF"
+  kset "$C/ksplashrc" KSplash Engine KSplashQML
+  # live session: no auto-lock; DemonOS lock-screen wallpaper (was Garuda's Maldrakor)
+  kset "$C/kscreenlockerrc" Daemon Autolock false
+  kset "$C/kscreenlockerrc" Daemon LockOnResume false
+  kset "$C/kscreenlockerrc" "Greeter][Wallpaper][org.kde.image][General" Image "file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png"
+  kset "$C/kscreenlockerrc" "Greeter][Wallpaper][org.kde.image][General" PreviewImage "file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png"
+  # fish: keep Garuda's config, add the DemonOS greeting + fastfetch preset
+  if [[ -f "$C/fish/config.fish" ]] && ! grep -q 'demonos.fish' "$C/fish/config.fish"; then
+    sed -i '\|^source /usr/share/garuda/garuda-fish-config/config.fish|a source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish # DemonOS PhantomCore additions' "$C/fish/config.fish"
+    grep -q 'demonos.fish' "$C/fish/config.fish" || echo 'source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish # DemonOS PhantomCore additions' >> "$C/fish/config.fish"
+  elif [[ ! -f "$C/fish/config.fish" ]]; then
+    install -D -m 0644 /dev/null "$C/fish/config.fish"
+    echo 'source /usr/share/demonos/skel-overrides/.config/fish/demonos.fish' > "$C/fish/config.fish"
+  fi
+  # Garuda's Setup Assistant installs software over the network on first login;
+  # on the DemonOS live medium the Lillith awakening dialog is the first-run flow.
+  rm -f "$C/autostart/setup-assistant.desktop"
+}
+if [[ -d "$SKEL" ]]; then
+  for f in kdeglobals kscreenlockerrc fish/config.fish autostart/setup-assistant.desktop; do keep_orig "$SKEL/$f"; done
+  brand_cfg "$SKEL"
+fi
+while IFS=: read -r _u _ uid gid _ home _; do
+  (( uid >= 1000 && uid < 60000 )) || continue
+  [[ -n "$home" && "$home" != / && -d "$home/.config" ]] || continue
+  [[ -e "$home/.config/plasma-org.kde.plasma.desktop-appletsrc" ]] && continue
+  brand_cfg "$home/.config"
+  chown -R "$uid:$gid" "$home/.config" 2>/dev/null || true
+done < /etc/passwd
+# 5. Garuda repos stay enabled (garuda-config-agent's pacman.yaml normally adds them;
+#    this is only a fallback so the base can be updated from Garuda/Chaotic-AUR)
+PC=/etc/pacman.conf
+if [[ -f $PC && -s /etc/pacman.d/chaotic-mirrorlist ]]; then
+  grep -q '^\[garuda\]' $PC || sed -i '0,/^\[core\]/s//[garuda]\nInclude = \/etc\/pacman.d\/chaotic-mirrorlist\n\n[core]/' $PC
+  grep -q '^\[chaotic-aur\]' $PC || printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' >> $PC
+fi
+exit 0

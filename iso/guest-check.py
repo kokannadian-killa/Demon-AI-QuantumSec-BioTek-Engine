@@ -11,9 +11,12 @@ one without a clicked consent card), to prove a local model answers.
 Output: a plain-text report on stdout, one "== name" section per check, and a
 final "RESULT name PASS|FAIL" table.
 """
-import re, socket, sys, time
+import os, re, socket, sys, time
 
 sock_path, log_path, after = sys.argv[1], sys.argv[2], int(sys.argv[3])
+# EXPECT_GARUDA=1 (set by the caller for iso/profile-garuda ISOs) adds the
+# Garuda-base + DemonOS-branding checks.
+GARUDA = os.environ.get("EXPECT_GARUDA") == "1"
 MODEL = "/usr/share/lillith/models/qwen2.5-0.5b-instruct-q4_k_m.gguf"
 U = ("runuser -u demon -- env HOME=/home/demon XDG_RUNTIME_DIR=/run/user/1000"
      " DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus")
@@ -103,6 +106,21 @@ def run(name, cmd, timeout=300):
     log(f"== {name}  (rc={rc})\n$ {cmd}\n{text}\n")
     return rc, text
 
+def screendump(name):
+    import os
+    mon = os.path.join(os.path.dirname(sock_path), "mon.sock")
+    out = os.path.join(os.path.dirname(sock_path), name)
+    for _ in range(5):
+        try:
+            m = socket.socket(socket.AF_UNIX); m.settimeout(20); m.connect(mon); time.sleep(0.3)
+            try: m.recv(65536)
+            except Exception: pass
+            m.sendall(f"screendump {out} -f png\n".encode()); time.sleep(2); m.close()
+            if os.path.exists(out): return out
+        except Exception as e:
+            time.sleep(3)
+    return None
+
 R = {}
 run("uptime+system state", "uptime; systemctl is-system-running; systemctl is-active sddm display-manager")
 rc, t = run("desktop processes", "pgrep -a kwin_wayland; pgrep -au demon plasmashell; loginctl list-sessions --no-legend")
@@ -140,6 +158,41 @@ rc, t = run("LLMNR + mDNS off", "resolvectl status 2>/dev/null | grep -iE 'LLMNR
 R["LLMNR off (no :5355 listener)"] = "NO_LLMNR_LISTENER" in t
 R["mDNS off (no :5353 listener)"] = "NO_MDNS_LISTENER" in t
 
+if GARUDA:
+    shot = screendump("shot-desktop-lillith.png")
+    print("DESKTOP SCREENSHOT:", shot, flush=True)
+    # The base really is Garuda: Garuda/Chaotic-AUR packages installed + repos configured
+    rc, t = run("Garuda base packages", "pacman -Q garuda-dr460nized garuda-common-settings garuda-hooks linux-garuda chaotic-keyring chaotic-mirrorlist; "
+                "pacman -Qi garuda-dr460nized | grep -E '^(Packager|Version|Repository)'; pacman -Q | wc -l; pacman -Qq | grep -c '^garuda-'")
+    R["Garuda base packages installed (pacman -Q garuda-* linux-garuda chaotic-*)"] = rc == "0" and "garuda-dr460nized" in t and "linux-garuda" in t
+    rc, t = run("Garuda repos in /etc/pacman.conf", "grep -nE '^\\[(garuda|core|extra|multilib|chaotic-aur)\\]' /etc/pacman.conf; "
+                "pacman-key --list-keys EF925EA60F33D0CB85C44AD13056513887B78AEB | head -3; uname -r")
+    R["[garuda] + [chaotic-aur] in /etc/pacman.conf"] = "[garuda]" in t and "[chaotic-aur]" in t
+    R["running kernel is linux-garuda"] = "-garuda" in t
+    # DemonOS branding wins over Garuda's
+    rc, t = run("os-release / lsb-release", "cat /etc/os-release; cat /etc/lsb-release; cat /etc/issue")
+    R["os-release NAME=DemonOS PhantomCore (ID_LIKE garuda)"] = 'NAME="DemonOS PhantomCore"' in t and re.search(r"^ID=demonos\s*$", t, re.M) is not None and 'ID_LIKE="garuda arch"' in t
+    R["lsb-release DISTRIB_ID=DemonOS"] = "DISTRIB_ID=DemonOS" in t
+    rc, t = run("SDDM theme", "cat /etc/sddm.conf.d/*.conf; sddm --example-config 2>/dev/null | grep -m1 -A0 '^Current' ; ls /usr/share/sddm/themes; systemctl is-active sddm; readlink -f /etc/systemd/system/display-manager.service")
+    R["SDDM theme Current=demonos (sddm active)"] = re.search(r"^Current=demonos\s*$", t, re.M) is not None and re.search(r"^active\s*$", t, re.M) is not None
+    rc, t = run("Plymouth theme", "plymouth-set-default-theme 2>/dev/null || grep -i '^Theme' /etc/plymouth/plymouthd.conf; ls /usr/share/plymouth/themes; cat /proc/cmdline")
+    R["Plymouth default theme demonos"] = re.search(r"^(Theme=)?demonos\s*$", t, re.M) is not None
+    rc, t = run("KDE look-and-feel + wallpaper", "grep -E 'LookAndFeelPackage|ColorScheme' /home/demon/.config/kdeglobals; "
+                "grep -E '^Theme' /home/demon/.config/ksplashrc; "
+                "grep -E 'Image=|wallpaperplugin' /home/demon/.config/plasma-org.kde.plasma.desktop-appletsrc | sort -u | head; "
+                "grep -E '^(icon|launchers)=' /home/demon/.config/plasma-org.kde.plasma.desktop-appletsrc | head -6; "
+                "ls /usr/share/plasma/look-and-feel/ | grep -iE 'demonos|dr460'")
+    R["Plasma LnF org.demonos.phantomcore + DemonOS colours"] = "LookAndFeelPackage=org.demonos.phantomcore" in t and "ColorScheme=DemonOS" in t
+    R["Plasma desktop wallpaper is DemonOS"] = "wallpapers/DemonOS" in t
+    R["Dr460nized panel+dock with DemonOS start icon, Lillith pinned"] = "demonos-start.png" in t and "applications:lillith.desktop" in t
+    rc, t = run("fastfetch logo + GRUB defaults", "grep -n '\"source\"' /usr/share/fastfetch/presets/demonos.jsonc; ls -la /usr/share/icons/demonos/; "
+                "grep -E '^GRUB_(DISTRIBUTOR|THEME)' /etc/default/grub; "
+                "fastfetch --config /usr/share/fastfetch/presets/demonos.jsonc --pipe --logo none 2>/dev/null | grep -E 'OS|Kernel' | head -3")
+    R["fastfetch DemonOS logo + OS line"] = "/usr/share/icons/demonos/demonos-fastfetch.png" in t and re.search(r"OS:?\s+DemonOS PhantomCore", t) is not None
+    R["GRUB defaults DemonOS (distributor + theme)"] = 'GRUB_DISTRIBUTOR="DemonOS"' in t and "themes/demonos/theme.txt" in t
+    rc, t = run("file capabilities survived the squashfs", "getcap /usr/bin/newuidmap /usr/bin/newgidmap /usr/bin/ping 2>&1; getcap -r /usr/bin /usr/lib 2>/dev/null | wc -l")
+    R["file capabilities present (getcap)"] = "cap_" in t
+
 # main's newer features (Dream learning, Bots tab) are in the installed build:
 # strings in the binaries + `--tab bots` opens the Bots tab (screendump below).
 rc, t = run("Bots tab + Dream learning present",
@@ -155,23 +208,23 @@ lines = t.splitlines()
 nums = [int(x) for x in lines if x.strip().isdigit()]
 R["Dream learning strings in /usr/bin/lillith"] = len(nums) >= 2 and all(n > 0 for n in nums[:2])
 R["lillith-settings --tab bots running"] = bool(re.search(r"^\s*\d+ \S*lillith-settings --tab bots", t, re.M))
-def screendump(name):
-    import os
-    mon = os.path.join(os.path.dirname(sock_path), "mon.sock")
-    out = os.path.join(os.path.dirname(sock_path), name)
-    for _ in range(5):
-        try:
-            m = socket.socket(socket.AF_UNIX); m.settimeout(20); m.connect(mon); time.sleep(0.3)
-            try: m.recv(65536)
-            except Exception: pass
-            m.sendall(f"screendump {out} -f png\n".encode()); time.sleep(2); m.close()
-            if os.path.exists(out): return out
-        except Exception as e:
-            time.sleep(3)
-    return None
 shot = screendump("shot-bots-tab.png")
 print("BOTS-TAB SCREENSHOT:", shot, flush=True)
 R["Bots tab screenshot taken"] = shot is not None
+if GARUDA:
+    # The live user is auto-logged-in, so the SDDM greeter never shows on its own;
+    # render the installed DemonOS SDDM theme in SDDM's test mode for a screenshot.
+    run("close bots tab", "pkill -u demon -f 'lillith-settings --tab bots'; sleep 3; true")
+    rc, t = run("SDDM DemonOS theme (sddm-greeter --test-mode)",
+                "LP=$(pgrep -u demon -x lillith | head -1); "
+                "E=$(tr '\\0' '\\n' </proc/$LP/environ | grep -E '^(WAYLAND_DISPLAY|DISPLAY|XDG_SESSION_TYPE|XDG_CURRENT_DESKTOP)=' | tr '\\n' ' '); "
+                "G=$(command -v sddm-greeter-qt6 || command -v sddm-greeter); echo greeter=$G; "
+                f"{U} $E setsid -f $G --test-mode --theme /usr/share/sddm/themes/demonos >/tmp/sddm-test.log 2>&1; "
+                "sleep 45; pgrep -au demon -f 'sddm-greeter' | head -2; tail -3 /tmp/sddm-test.log", 200)
+    shot = screendump("shot-sddm-demonos-theme.png")
+    print("SDDM THEME SCREENSHOT:", shot, flush=True)
+    R["SDDM DemonOS theme renders (greeter test mode)"] = shot is not None and "sddm-greeter" in t and "--test-mode" in t
+    run("close greeter", "pkill -u demon -f 'sddm-greeter'; true")
 run("listening sockets before model", "ss -Hltnp")
 run("start llama-server on 127.0.0.1", f"{U} sh -c 'nohup /opt/llama/llama-server -m {MODEL} --host 127.0.0.1 --port 8080 -c 512 -t 2 --jinja >/tmp/llama.log 2>&1 &'; sleep 2; pgrep -a llama-server")
 rc, t = run("wait for /health", "for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && break; sleep 10; done; echo; tail -5 /tmp/llama.log", 1500)

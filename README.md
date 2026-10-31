@@ -21,7 +21,7 @@ Notes:
 
 Roadmap:
 
-- Next: rebase the ISO on Garuda Linux Dragonized (KDE) with full DemonOS PhantomCore rebranding (in progress). The current ISO profile is based on Arch Linux archiso (releng) with KDE Plasma; it is not Garuda-based yet.
+- Garuda Linux Dr460nized (KDE) rebase with full DemonOS PhantomCore rebranding: verified in the `garuda/dragonized-rebase` pull request (`iso/profile-garuda`; BIOS and UEFI QEMU boot tests 31/31 guest checks each; see `iso/garuda/README.md`). The Arch Linux archiso (releng) profile `iso/profile` is kept alongside it.
 
 ---
 
