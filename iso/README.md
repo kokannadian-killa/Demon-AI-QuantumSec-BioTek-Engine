@@ -245,3 +245,4 @@ Any Alert makes the overall status **CRITICAL**. In a QEMU/TCG guest the emulate
   repackages the pinned upstream Ubuntu build, which runs fine on Arch: it needs
   glibc, libstdc++, libgomp, openssl, zlib and zstd.
 * The ISO is unsigned, and Secure Boot isn't supported, the same as releng.
+  Signing plan and open decisions: [`docs/ISO_SIGNING.md`](../docs/ISO_SIGNING.md).

@@ -374,5 +374,6 @@ The paths used on the build box were:
 * **"2 missing" under File Integrity** on a fresh live user. Those are watched config files that don't exist yet. It is a notice only.
 * **No KVM in the tests** (it crashes this host). TCG boots take about 2.5 min to reach the desktop and about 16 min for a full test run.
 * **The ISO is not signed** (no Secure Boot shim). It is not uploaded anywhere and lives only on the build box.
+  * Signing status and plan (TODOs for Ko: release signature, Secure Boot yes/no, publishing channel; no keys generated): [`docs/ISO_SIGNING.md`](ISO_SIGNING.md). Until then release notes say "unsigned, local-only ISO; Secure Boot off".
 * **Red team is local simulation only.** Nothing in the ISO attacks or scans other hosts.
 * **CI Windows job** takes about 18 min. The fmt/clippy fixes needed for green CI went in via PR #14 (formatting only).
