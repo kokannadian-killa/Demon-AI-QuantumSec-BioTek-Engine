@@ -10,6 +10,11 @@ What it contains:
 - **The original Lillith desktop avatar**, with nothing removed, plus Dream learning and the Bots tab.
 - **QuantumSec**: `crates/lillith-quantumsec`, the blood-seal consent dialog, and the systemd units in `linux/systemd/`.
 - **The Biotek rename**: the data home is `~/.biotek`; see `docs/BIOTEK_TERMINOLOGY_MAP.md`.
+- **Biotek Engine status**: despite the repository name, the upstream Biotek Engine
+  (`biotekengine`, BoiTekEngine repo) is **not** included, in git or in the ISO. No
+  engine artifact, licence or runtime contract is pinned yet; that is Ko's call. The only
+  pinned local runtime is llama.cpp `b11829` (`184f653`, MIT) on `127.0.0.1:8080`. See
+  `docs/BIOTEK_TERMINOLOGY_MAP.md` §0 and §8a (loopback ports reserved for the engine).
 - **The DemonOS PhantomCore ISO profile**: `iso/`, with `iso/build-iso.sh` and `iso/test-boot.sh`.
 - **The handover**: `docs/HANDOVER.md` (launch, test and rebuild commands, boot proof, limitations).
 

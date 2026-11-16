@@ -4,6 +4,34 @@ Branch: `biotek/terminology` (off `quantumsec/integration` @ `e0248a6`).
 Scope: Lillith OS + QuantumSec (this repo). Rules: additive, non-breaking,
 nothing deleted, legacy names kept as read fallbacks / deprecated aliases.
 
+## 0. Engine artifact status (read this first)
+
+**No authoritative Biotek Engine artifact is pinned yet.** Nothing in this repo,
+its ISO profile (`iso/`, archiso on `main`; the Garuda profile on
+`garuda/dragonized-rebase` likewise) or the built ISO contains the upstream
+`biotekengine` binary, its `gui/`, its units, or its config. `git grep -i
+biotekengine -- iso linux bundle tools` is empty on `main` @ `7d4472b` and on
+`garuda/dragonized-rebase` @ `3f9833c`. The ISO ships Lillith + QuantumSec and the
+`~/.biotek` data home only; it does **not** contain "the full Biotek Engine".
+
+The only pinned local runtime is **llama.cpp `b11829`** (commit
+`184f6536024668e8908ab8c86033d56708e62b40`, MIT), sha256-locked in
+`bundle/llama/llama.lock`, packaged as `lillith-llama-bin` and served on
+`127.0.0.1:8080` (loopback only).
+
+> **TODO (Ko's call, not picked here):** to integrate the engine, name all three:
+> 1. **Source/artifact pin**: an exact `kokannadian-killa/BoiTekEngine` commit, or a
+>    release tarball/binary with its sha256.
+> 2. **License**: upstream is marked "PROPRIETARY"; written permission to
+>    redistribute it inside the ISO (or a licence file to ship).
+> 3. **Runtime contract**: which commands Lillith may run (defensive / read-only
+>    only, see §7.8), the listener ports (host side per §8: `127.0.0.1:18080` GUI,
+>    `:18765` WebSocket, `:9090` metrics), work dir `%h/.biotek/engine`, and how the
+>    approval gate maps onto the blood-seal consent dialog.
+>
+> Until those exist, docs, release notes and the ISO must not claim the full engine
+> is integrated.
+
 ## 1. Reference material found
 
 | Source | What it shows |
@@ -104,7 +132,7 @@ Two resolvers in `lillith_setup::biotek`, deliberately separate:
 | Root | `$BIOTEK_HOME` → `$AETHER_HOME` (deprecated) → `~/.biotek` | work dir `<biotek home>/engine` (= `%h/.biotek/engine` in a user unit) |
 | Config | `~/.biotek/config/*.toml` | `$BIOTEKENGINE_CONFIG` → `<work_dir>/config/biotekengine.toml` |
 | Data | layout in §4 | `$BIOTEKENGINE_DATA_DIR` → `<work_dir>/data` |
-| Models | Lillith's own GGUF scan paths | `~/.biotekengine/models` (`$HOME`-relative upstream) |
+| Models | Lillith's own GGUF scan paths, **plus `~/.biotekengine/models`** (added last in `scan::default_scan_dirs`; older paths unchanged) | `~/.biotekengine/models` (`$HOME`-relative upstream) |
 | Engine state | n/a | `<work_dir>/.biotekengine/{reports,probability,lab/registry}` (`state_dir`, `reports_dir()`) |
 | Names | `biotek`, `BIOTEK_*` | unchanged upstream: `BIOTEKENGINE_*`, `biotekengine.service`, `biotekengine_*` metrics |
 
@@ -122,7 +150,8 @@ Lillith creates or writes engine paths.
 * `legacy_aether_home()`: `~/.aether` (read fallback / migration source only; never written).
 * `resolve_read(rel)`: `~/.biotek/<rel>` if it exists, else `~/.aether/<rel>` if it exists, else `~/.biotek/<rel>`. All writes go to `~/.biotek`.
 * `migrate_from_aether()`: one-time, **copy-only**. Copies every regular file from `~/.aether` that is missing in `~/.biotek`; never overwrites, never deletes, skips symlinks; writes `~/.biotek/.migrated-from-aether` and is a no-op afterwards; then creates the layout. `~/.aether` is left untouched.
-* Nothing calls these yet (no QuantumSec code exists on `quantumsec/integration`). New modules should call `migrate_from_aether()` once at startup, then `biotek_home()` / `resolve_read()`.
+* *(Earlier snapshot: "nothing calls these yet".)* Now wired: the desktop start (`lillith` with no subcommand, `run_overlay` in `apps/lillith/src/main.rs`) calls `migrate_from_aether()` once before anything else reads `~/.biotek`. It is copy-only, a no-op after the marker exists, logs what it copied, and never stops the app on error. QuantumSec (`shield.rs`, `consent.rs`, the settings tab) reads through `biotek_home()`.
+* Model scan: `~/.biotekengine/models` is scanned as an extra directory (option (a) in §4); every older scan path is kept, in the same order.
 
 ## 6. Intentionally left as "aether"
 
@@ -175,3 +204,27 @@ Recommended fix (unit / launch level only):
 
 Constants for these live in `lillith_setup::biotek` (`ENGINE_GUI_PORT`, `ENGINE_WS_PORT`,
 `ENGINE_METRICS_PORT`, `ENGINE_UNIT`, `ENGINE_BIN`, `ENGINE_METRICS_PREFIX`).
+
+### 8a. Port clash resolution (host side, loopback only)
+
+Two clashes exist: engine GUI `:8080` vs llama-server `127.0.0.1:8080`, and engine
+WebSocket `:8765` vs `lillith-py-api.service` (`[sidecar] port`, default 8765). Lillith's
+services **keep** their ports. The engine is published on other loopback ports:
+
+| Engine listener | Engine side (fixed upstream) | Host side default | Override |
+|---|---|---|---|
+| static GUI | 8080 | `127.0.0.1:18080` | `BIOTEK_ENGINE_GUI_PORT` |
+| WebSocket | 8765 | `127.0.0.1:18765` | `BIOTEK_ENGINE_WS_PORT` |
+| Prometheus | 9090 | `127.0.0.1:9090` | `BIOTEK_ENGINE_METRICS_PORT` |
+
+`lillith_setup::biotek::engine_ports()` returns these (`EnginePorts`), refuses 8080 / 8765 /
+11434 and duplicates, and `EnginePorts::publish_args()` gives the loopback-only container
+flags (`-p 127.0.0.1:18080:8080 …`). Host is always `ENGINE_BIND_HOST` = `127.0.0.1`. Nothing
+launches the engine yet (see §0); this is the contract a launcher must use.
+
+Bind audit (`rg 0.0.0.0` on `main` @ `7d4472b`): no Lillith listener binds `0.0.0.0`. Every hit
+is a test asserting refusal (`lillith-mind/src/server.rs`, `llm.rs`, `lillith-setup/src/launch.rs`,
+`local.rs`, `apps/lillith/src/chat.rs`), the ISO guest check that llama-server is *not* on
+`0.0.0.0:8080`, or a doc/comment. `lillith-py-api.service` runs `serve --host 127.0.0.1` with
+`IPAddressDeny=any` / `IPAddressAllow=localhost`; llama-server is launched with
+`--host 127.0.0.1` (`launch.rs` `LOOPBACK_HOST`).
