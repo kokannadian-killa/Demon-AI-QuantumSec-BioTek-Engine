@@ -255,7 +255,8 @@ impl SettingsTab for QuantumSecTab {
                         if let Some(h) = home {
                             if let Ok(log) = ConsentLog::open_in(h.join("consent")) {
                                 if let Ok(mut tok) = log.approve(&p) {
-                                    let nonce = tok.nonce.clone();
+                                    // Non-secret binding digest; the nonce is never logged.
+                                    let token_ref = tok.binding().to_string();
                                     match lillith_quantumsec::lockdown::execute_with_token(
                                         &p, &mut tok,
                                     ) {
@@ -287,7 +288,7 @@ impl SettingsTab for QuantumSecTab {
                                                 lillith_quantumsec::consent::ConsentDecision::Approve,
                                                 &summary,
                                                 &p.commands,
-                                                &nonce,
+                                                &token_ref,
                                             );
                                         }
                                         Err(e) => {
@@ -297,7 +298,7 @@ impl SettingsTab for QuantumSecTab {
                                                 lillith_quantumsec::consent::ConsentDecision::Deny,
                                                 &format!("execute failed: {e}"),
                                                 &p.commands,
-                                                &nonce,
+                                                &token_ref,
                                             );
                                         }
                                     }

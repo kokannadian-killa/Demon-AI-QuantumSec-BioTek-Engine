@@ -127,16 +127,25 @@ Fish helpers below are **shown only**. Running them requires the blood seal
 
     /// Blood-seal proposal that would apply the Fish helpers (still local echo
     /// by default — real `fish -c` only if caller rebuilds with local_simulation=false).
+    ///
+    /// Each helper line is echoed as one typed argv argument, so the Biotek
+    /// home path (already single-quoted inside the helper) is never re-parsed
+    /// by a shell.
     pub fn fish_apply_proposal(&self) -> crate::lockdown::LockdownProposal {
-        let mut cmds: Vec<String> = self
+        let mut argv: Vec<Vec<String>> = self
             .fish_helpers()
             .into_iter()
-            .map(|l| format!("echo '[QuantumSec] FISH PROPOSAL: {l}'"))
+            .map(|l| {
+                vec![
+                    "echo".to_string(),
+                    format!("[QuantumSec] FISH PROPOSAL: {l}"),
+                ]
+            })
             .collect();
-        cmds.push("true".into());
-        let mut p = crate::lockdown::LockdownProposal::new(
+        argv.push(vec!["true".into()]);
+        let mut p = crate::lockdown::LockdownProposal::from_argv(
             "Apply personalization Fish helpers (shown as echo; seal to acknowledge)",
-            cmds,
+            argv,
         );
         p.local_simulation = true;
         p

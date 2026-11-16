@@ -8,18 +8,36 @@ use crate::lockdown::LockdownProposal;
 use std::path::Path;
 
 /// Blood-seal proposal to enable the QuantumSec user unit (exact real commands).
+///
+/// Built from typed argv: the unit path is a single argument (spaces and
+/// shell metacharacters stay literal) and nothing runs through `sh -c`. The
+/// card shows the POSIX-quoted rendering of that same argv.
 pub fn enable_quantumsec_unit_proposal(unit_path_hint: &Path) -> LockdownProposal {
-    let unit = unit_path_hint.display().to_string();
-    let cmds = vec![
-        "mkdir -p ~/.config/systemd/user".into(),
-        format!(
-            "install -m 644 {} ~/.config/systemd/user/lillith-quantumsec.service",
-            unit
-        ),
-        "systemctl --user daemon-reload".into(),
-        "systemctl --user enable --now lillith-quantumsec.service".into(),
+    let mut unit = unit_path_hint.display().to_string();
+    if unit.starts_with('-') {
+        // Never let a path read as an `install` option.
+        unit = format!("./{unit}");
+    }
+    let s = |v: &[&str]| v.iter().map(|w| w.to_string()).collect::<Vec<String>>();
+    let argv = vec![
+        s(&["mkdir", "-p", "~/.config/systemd/user"]),
+        vec![
+            "install".into(),
+            "-m".into(),
+            "644".into(),
+            unit,
+            "~/.config/systemd/user/lillith-quantumsec.service".into(),
+        ],
+        s(&["systemctl", "--user", "daemon-reload"]),
+        s(&[
+            "systemctl",
+            "--user",
+            "enable",
+            "--now",
+            "lillith-quantumsec.service",
+        ]),
     ];
-    let mut p = LockdownProposal::new("Enable QuantumSec user unit (systemctl --user)", cmds);
+    let mut p = LockdownProposal::from_argv("Enable QuantumSec user unit (systemctl --user)", argv);
     p.local_simulation = false;
     p.proposal_only = false;
     p
@@ -27,8 +45,18 @@ pub fn enable_quantumsec_unit_proposal(unit_path_hint: &Path) -> LockdownProposa
 
 /// Blood-seal proposal to disable/stop the unit (exact real commands).
 pub fn disable_quantumsec_unit_proposal() -> LockdownProposal {
-    let cmds = vec!["systemctl --user disable --now lillith-quantumsec.service".into()];
-    let mut p = LockdownProposal::new("Disable QuantumSec user unit (systemctl --user)", cmds);
+    let argv = vec![[
+        "systemctl",
+        "--user",
+        "disable",
+        "--now",
+        "lillith-quantumsec.service",
+    ]
+    .iter()
+    .map(|w| w.to_string())
+    .collect()];
+    let mut p =
+        LockdownProposal::from_argv("Disable QuantumSec user unit (systemctl --user)", argv);
     p.local_simulation = false;
     p.proposal_only = false;
     p
@@ -61,6 +89,22 @@ mod tests {
     }
 
     #[test]
+    fn disable_is_argv_without_shell() {
+        let p = disable_quantumsec_unit_proposal();
+        assert_eq!(p.argv.len(), 1);
+        assert_eq!(
+            p.commands[0],
+            "systemctl --user disable --now lillith-quantumsec.service"
+        );
+    }
+
+    #[test]
+    fn dash_leading_unit_path_is_not_an_option() {
+        let p = enable_quantumsec_unit_proposal(&PathBuf::from("-t/tmp"));
+        assert_eq!(p.argv[1][3], "./-t/tmp");
+    }
+
+    #[test]
     fn enable_runs_with_fake_systemctl_on_path() {
         let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let root = std::env::temp_dir().join(format!(
@@ -76,7 +120,9 @@ mod tests {
         let bin = root.join("bin");
         std::fs::create_dir_all(&home).unwrap();
         std::fs::create_dir_all(&bin).unwrap();
-        let unit_src = root.join("lillith-quantumsec.service");
+        // A space (and a quote) in the source path must stay one operand.
+        let unit_src = root.join("unit dir 'q'").join("lillith-quantumsec.service");
+        std::fs::create_dir_all(unit_src.parent().unwrap()).unwrap();
         std::fs::write(&unit_src, "[Unit]\nDescription=test\n").unwrap();
         let log = root.join("systemctl.log");
         let fake = bin.join("systemctl");
@@ -103,7 +149,7 @@ mod tests {
         std::env::set_var("PATH", &path);
 
         let p = enable_quantumsec_unit_proposal(&unit_src);
-        let mut tok = ConsentToken::issue(&p.id);
+        let mut tok = ConsentToken::issue(&p).unwrap();
         let outs = execute_with_token(&p, &mut tok).expect("execute");
         assert_eq!(outs.len(), p.commands.len());
         assert!(tok.consumed);

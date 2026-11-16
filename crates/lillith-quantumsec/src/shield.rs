@@ -390,7 +390,8 @@ mod tests {
         let p = shield.propose_lockdown();
         assert!(p.local_simulation);
         // Without approve, execute path refuses.
-        let mut bad = ConsentToken::issue("nope");
+        let other = LockdownProposal::local_simulation_default();
+        let mut bad = ConsentToken::issue(&other).unwrap();
         assert!(shield.execute_approved(&p, &mut bad).is_err());
 
         let tok = shield.approve_lockdown(true).unwrap();

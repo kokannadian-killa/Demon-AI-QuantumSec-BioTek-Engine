@@ -83,41 +83,47 @@ pub struct BotEntry {
 
 impl BotEntry {
     /// Blood-seal proposal for deploying this bot (never executes here).
+    ///
+    /// LOCAL SIMULATION: every line is a typed `echo` argv, so registry JSON
+    /// fields (`deploy_command`, `id`) are only ever echoed as one literal
+    /// argument and never reach a shell.
     pub fn deploy_proposal(&self, biotek: &Path) -> LockdownProposal {
-        let mut cmds = Vec::new();
+        let echo = |m: String| vec!["echo".to_string(), m];
+        let mut argv = Vec::new();
         if self.tor_aware {
-            cmds.push(
-                "echo '[QuantumSec] ANON: ALL_PROXY=socks5h://127.0.0.1:9050 (Tor must already be up)'"
+            argv.push(echo(
+                "[QuantumSec] ANON: ALL_PROXY=socks5h://127.0.0.1:9050 (Tor must already be up)"
                     .into(),
-            );
-            cmds.push(
-                "echo '[QuantumSec] ANON: no local DNS — socks5h only (see lillith-learn worker policy)'"
+            ));
+            argv.push(echo(
+                "[QuantumSec] ANON: no local DNS — socks5h only (see lillith-learn worker policy)"
                     .into(),
-            );
+            ));
         }
-        cmds.push(format!(
-            "echo '[QuantumSec] DEPLOY PROPOSAL ({lane}): {cmd}'",
+        argv.push(echo(format!(
+            "[QuantumSec] DEPLOY PROPOSAL ({lane}): {cmd}",
             lane = self.lane.label(),
             cmd = self.deploy_command
-        ));
-        cmds.push(format!(
-            "echo '[QuantumSec] registry path: {}'",
+        )));
+        argv.push(echo(format!(
+            "[QuantumSec] registry path: {}",
             biotek
                 .join("bots")
                 .join(self.lane.dir_name())
                 .join(&self.id)
                 .display()
-        ));
-        cmds.push("true".into());
-        let mut p = LockdownProposal::new(
+        )));
+        argv.push(vec!["true".into()]);
+        let mut p = LockdownProposal::from_argv(
             format!(
                 "Deploy {} bot `{}` — review exact command",
                 self.lane.label(),
                 self.id
             ),
-            cmds,
+            argv,
         );
-        p.id = format!("deploy-{}-{}", self.id, p.proposed_unix);
+        let suffix = p.id.trim_start_matches("lockdown-").to_string();
+        p.id = format!("deploy-{}-{}", self.id, suffix);
         p.local_simulation = true; // proposals stay simulation until a future Phase elevates
         p
     }

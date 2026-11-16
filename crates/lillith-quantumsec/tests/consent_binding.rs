@@ -7,18 +7,20 @@
 //! proposals only; that path returns before anything is spawned, see
 //! `lockdown.rs:176-179`).
 //!
-//! Convention: every `documents_current_*` test asserts the CURRENT
-//! (vulnerable) behaviour at 7d4472bc, so it passes today. When the
-//! production code is fixed (quoted operands or typed argv, approval bound to
-//! the exact execution plan, a unique id, a non-forgeable token), the test
-//! fails. At that point flip it into a regression test for the fix. These are
-//! review findings, not confirmed exploits; reachability is in the QA report.
+//! History: the QA review (8a24d1a9) added `documents_current_*` tests that
+//! asserted the vulnerable behaviour at 7d4472bc. The fix branch
+//! (`qsec/consent-binding-fix`) flipped each one into a `fixed_*` regression
+//! test covering the same case: typed argv with quoted display, approval bound
+//! to a SHA-256 of the exact plan + flags, unique ids, a token without serde,
+//! a random never-logged nonce, and no shell for LOCAL SIMULATION cards.
 #![cfg(unix)]
 
 use std::path::Path;
 
 use lillith_quantumsec::consent::ConsentLog;
-use lillith_quantumsec::lockdown::{execute_with_token, ConsentToken, LockdownProposal};
+use lillith_quantumsec::lockdown::{
+    execute_with_token, ConsentToken, LockdownError, LockdownProposal,
+};
 use lillith_quantumsec::{registry, report, teams, units};
 
 // ---------------------------------------------------------- shell parsing
@@ -177,45 +179,56 @@ fn fixed_settings_path_parses_to_intended_argv() {
     assert!(ops(&p).is_empty() && p.comment.is_none() && !p.cmd_subst);
 }
 
-/// (i) A source path with a space becomes two operands (units.rs:12-18).
+/// (i) A source path with a space stays ONE operand: the typed argv keeps
+/// it whole and the shown line quotes it (was units.rs:12-18).
 #[test]
-fn documents_current_unit_path_with_space_splits_into_two_operands() {
+fn fixed_unit_path_with_space_stays_one_operand() {
     let l = install_line("/tmp/unit files/example.service");
     let w = sh_parse(&l);
     let w = words(&w);
-    assert_eq!(w.len(), 6, "{l:?} -> {w:?}");
-    assert_eq!(&w[3..5], ["/tmp/unit", "files/example.service"]);
-    // The banner shows the same text, so display == execution, but the
-    // shell meaning differs from the displayed "one path" intent.
-    assert!(units::enable_quantumsec_unit_proposal(Path::new("/tmp/unit files/example.service"))
+    assert_eq!(w.len(), 5, "{l:?} -> {w:?}");
+    assert_eq!(w[3], "/tmp/unit files/example.service");
+    let p = units::enable_quantumsec_unit_proposal(Path::new("/tmp/unit files/example.service"));
+    // Display == execution: the executed argv has the same single operand.
+    assert_eq!(p.argv[1][3], "/tmp/unit files/example.service");
+    assert!(p
         .detail_block()
-        .contains("$ install -m 644 /tmp/unit files/example.service ~/.config"));
+        .contains("$ install -m 644 '/tmp/unit files/example.service' ~/.config"));
 }
 
-/// (ii) `;` and `#` change the shell meaning: a second command appears and
-/// the destination operand is commented out.
+/// (ii) `;`, `#` and `$(..)` in the path stay literal: no extra command,
+/// no comment, no substitution, and the destination operand survives.
 #[test]
-fn documents_current_unit_path_metacharacters_change_shell_meaning() {
+fn fixed_unit_path_metacharacters_stay_literal() {
     let l = install_line("/tmp/unit; printf REVIEW_ONLY; #");
     let p = sh_parse(&l);
-    assert_eq!(ops(&p), [";", ";"], "{l:?}");
-    assert_eq!(words(&p), ["install", "-m", "644", "/tmp/unit", "printf", "REVIEW_ONLY"]);
-    assert!(p
-        .comment
-        .as_deref()
-        .is_some_and(|c| c.contains("~/.config/systemd/user/lillith-quantumsec.service")));
-    // And `$(..)` in a path would be command substitution.
-    assert!(sh_parse(&install_line("/tmp/$(printf x).service")).cmd_subst);
+    assert!(ops(&p).is_empty(), "{l:?}");
+    assert!(p.comment.is_none(), "{l:?}");
+    assert_eq!(
+        words(&p),
+        [
+            "install",
+            "-m",
+            "644",
+            "/tmp/unit; printf REVIEW_ONLY; #",
+            "~/.config/systemd/user/lillith-quantumsec.service",
+        ]
+    );
+    let prop =
+        units::enable_quantumsec_unit_proposal(Path::new("/tmp/unit; printf REVIEW_ONLY; #"));
+    assert_eq!(prop.argv[1][3], "/tmp/unit; printf REVIEW_ONLY; #");
+    // And `$(..)` in a path is not command substitution.
+    assert!(!sh_parse(&install_line("/tmp/$(printf x).service")).cmd_subst);
 }
 
 // ---------------------------------- (iii) token binds only to the proposal id
 
 /// (iii) Approve P, then mutate its commands (and flags) but keep its id:
-/// the token check accepts it. `matches` and `execute_with_token` compare
-/// only `proposal_id` + `consumed` (lockdown.rs:136-138, 170-175). Uses the
-/// `proposal_only` early return (lockdown.rs:176-179), so nothing spawns.
+/// the token is bound to a SHA-256 of the exact plan + flags, so `matches`
+/// and `execute_with_token` refuse. Uses `proposal_only` proposals, so
+/// nothing spawns even on the accepted path.
 #[test]
-fn documents_current_token_accepts_same_id_with_mutated_commands() {
+fn fixed_token_rejects_same_id_with_mutated_commands() {
     let dir = tempdir("iii");
     let log = ConsentLog::open_in(dir.join("consent")).unwrap();
     let mut approved = LockdownProposal::new("QA synthetic", vec!["true".into()]);
@@ -226,17 +239,32 @@ fn documents_current_token_accepts_same_id_with_mutated_commands() {
     mutated.commands = vec!["printf MUTATED_NOT_APPROVED".into()];
     mutated.summary = "different summary".into();
     assert_ne!(approved.detail_block(), mutated.detail_block());
-    assert!(tok.matches(&mutated), "token bound to bytes? (fixed)");
-    // The real gate accepts it. proposal_only => no spawn.
-    assert_eq!(execute_with_token(&mutated, &mut tok), Ok(Vec::new()));
+    assert!(
+        !tok.matches(&mutated),
+        "token must be bound to the exact plan"
+    );
+    // The real gate refuses and does not consume the token.
+    assert_eq!(
+        execute_with_token(&mutated, &mut tok),
+        Err(LockdownError::ConsentRequired)
+    );
+    assert!(!tok.is_consumed());
+    // The unmodified approved proposal is still accepted (proposal_only => no spawn).
+    assert!(tok.matches(&approved));
+    assert_eq!(execute_with_token(&approved, &mut tok), Ok(Vec::new()));
 
-    // Flags are not bound either: a token approved for a "PROPOSAL, not run"
-    // card also matches the same id with proposal_only=false (REAL COMMANDS).
-    let tok2 = log.approve(&approved).unwrap();
+    // Flags are bound too: a token approved for a "PROPOSAL, not run" card
+    // does not match the same id with proposal_only=false (REAL COMMANDS).
+    let mut tok2 = log.approve(&approved).unwrap();
     let mut real = approved.clone();
     real.proposal_only = false;
     assert_ne!(approved.seal_banner(), real.seal_banner());
-    assert!(tok2.matches(&real));
+    assert!(!tok2.matches(&real));
+    // Refused before anything could spawn.
+    assert_eq!(
+        execute_with_token(&real, &mut tok2),
+        Err(LockdownError::ConsentRequired)
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -254,11 +282,11 @@ fn same_second<T>(f: impl Fn() -> (T, u64)) -> (T, T) {
     }
 }
 
-/// (iv) Two proposals created in the same second share an id
-/// (lockdown.rs:70 `lockdown-{now_unix}`), so a token for one matches the
+/// (iv) Two proposals created in the same second get distinct ids
+/// (nanos + process counter + random), so a token for one never matches the
 /// other.
 #[test]
-fn documents_current_proposals_in_same_second_collide_on_id() {
+fn fixed_proposals_in_same_second_have_unique_ids() {
     let (a, b) = same_second(|| {
         let p = LockdownProposal::new("A", vec!["true".into()]);
         let u = p.proposed_unix;
@@ -268,45 +296,67 @@ fn documents_current_proposals_in_same_second_collide_on_id() {
         commands: vec!["printf OTHER".into()],
         ..b
     };
-    assert_eq!(a.id, b.id);
+    assert_ne!(a.id, b.id);
     let dir = tempdir("iv");
     let log = ConsentLog::open_in(dir.join("consent")).unwrap();
     let tok = log.approve(&a).unwrap();
-    assert!(tok.matches(&b), "approval of A unlocks B");
-    // The same holds for the unit factory (units.rs:22) and the local sim
-    // default (lockdown.rs:50).
+    assert!(!tok.matches(&b), "approval of A must not unlock B");
+    // The same holds for the unit factory and the local sim default.
     let (u1, u2) = same_second(|| {
         let p = units::enable_quantumsec_unit_proposal(Path::new("/x"));
         let u = p.proposed_unix;
         (p, u)
     });
-    assert_eq!(u1.id, u2.id);
+    assert_ne!(u1.id, u2.id);
+    let (s1, s2) = same_second(|| {
+        let p = LockdownProposal::local_simulation_default();
+        let u = p.proposed_unix;
+        (p, u)
+    });
+    assert_ne!(s1.id, s2.id);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 // --------------------------------------------- extra review findings
 
-/// The token is meant to be opaque, "created only by ConsentLog::approve"
-/// (lockdown.rs:111). It derives `Deserialize` with a private `consumed`
-/// field (lockdown.rs:112-122), so any caller can forge one from JSON
-/// without approving anything.
+/// The token is opaque, created only by `ConsentLog::approve`. It no longer
+/// derives `Deserialize` (or `Serialize`), so it cannot be forged from JSON
+/// or leaked into data. Checked at compile time via inherent-const probing.
 #[test]
-fn documents_current_consent_token_forgeable_via_serde() {
-    let p = LockdownProposal::new("QA synthetic", vec!["true".into()]);
-    let json = format!(
-        r#"{{"proposal_id":"{}","nonce":"0","approved_unix":0,"consumed":false}}"#,
-        p.id
-    );
-    let forged: ConsentToken = serde_json::from_str(&json).unwrap();
-    assert!(forged.matches(&p));
+fn fixed_consent_token_not_forgeable_via_serde() {
+    use std::marker::PhantomData;
+    trait Fallback {
+        const DESERIALIZE: bool = false;
+        const SERIALIZE: bool = false;
+    }
+    struct ProbeDe<T>(PhantomData<T>);
+    impl<T> Fallback for ProbeDe<T> {}
+    impl<T: serde::de::DeserializeOwned> ProbeDe<T> {
+        #[allow(dead_code)]
+        const DESERIALIZE: bool = true;
+    }
+    struct ProbeSer<T>(PhantomData<T>);
+    impl<T> Fallback for ProbeSer<T> {}
+    impl<T: serde::Serialize> ProbeSer<T> {
+        #[allow(dead_code)]
+        const SERIALIZE: bool = true;
+    }
+    // Probe self-check on a type that does implement both.
+    assert!(std::hint::black_box(
+        ProbeDe::<LockdownProposal>::DESERIALIZE
+    ));
+    assert!(std::hint::black_box(
+        ProbeSer::<LockdownProposal>::SERIALIZE
+    ));
+    assert!(!std::hint::black_box(ProbeDe::<ConsentToken>::DESERIALIZE));
+    assert!(!std::hint::black_box(ProbeSer::<ConsentToken>::SERIALIZE));
 }
 
-/// The nonce is a SipHash (fixed keys) of the second, thread id and pid
-/// (lockdown.rs:148-156). Two approvals in the same second on one thread
-/// get the same nonce. It is not random, and it is written to the consent
-/// log (consent.rs:99).
+/// The nonce is 128 bits from the OS CSPRNG: two approvals in the same
+/// second on one thread differ, and the nonce is never written to the
+/// consent log or shown by `Debug` (only the non-secret binding digest is).
 #[test]
-fn documents_current_nonce_is_deterministic_within_a_second() {
+fn fixed_nonce_is_random_and_never_logged() {
     let dir = tempdir("nonce");
     let log = ConsentLog::open_in(dir.join("consent")).unwrap();
     let p = LockdownProposal::new("QA synthetic", vec!["true".into()]);
@@ -315,28 +365,47 @@ fn documents_current_nonce_is_deterministic_within_a_second() {
         let u = t.approved_unix;
         (t, u)
     });
-    assert_eq!(a.nonce, b.nonce);
+    // Same proposal, same second, same thread: tokens differ only by nonce.
+    assert_eq!(a.proposal_id, b.proposal_id);
+    assert_eq!(a.approved_unix, b.approved_unix);
+    assert_eq!(a.binding(), b.binding());
+    assert_ne!(a, b, "nonces must differ");
+    assert!(format!("{a:?}").contains("<redacted>"));
+    // No record carries a nonce; each carries the binding digest.
+    let recs = log.list_recent(1000).unwrap();
+    assert!(!recs.is_empty());
+    for r in &recs {
+        assert!(r.token_nonce.is_empty(), "{r:?}");
+        assert_eq!(r.binding, a.binding());
+    }
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// "LOCAL SIMULATION" cards still go to `sh -c`
-/// (`execute_with_token` ignores `local_simulation`, lockdown.rs:176-188).
-/// They are safe only while every line stays a harmless `echo '..'`.
-/// Interpolated data that contains a `'` escapes the echo:
-/// registry.rs:98-102 (`deploy_command`, from same-user
-/// `~/.biotek/bots/registry.json`, registry.rs:168-173) and teams.rs:110-114
-/// (`title`, from `~/.biotek/teams/catalog.json`, teams.rs:204-209).
+/// "LOCAL SIMULATION" cards are typed `echo` argv and never reach `sh -c`.
+/// Interpolated data containing a `'` (registry `deploy_command` from
+/// `~/.biotek/bots/registry.json`; teams `title` from
+/// `~/.biotek/teams/catalog.json`) stays one literal echo argument, and the
+/// shown line quotes it so it cannot break out either.
 #[test]
-fn documents_current_local_simulation_echo_breakout() {
+fn fixed_local_simulation_echo_cannot_break_out() {
     let mut bot = registry::default_registry().remove(0);
     bot.deploy_command = "x'; printf BREAKOUT; echo '".into();
     let p = bot.deploy_proposal(Path::new("/tmp/qa-biotek"));
     assert!(p.local_simulation);
     assert_eq!(p.seal_banner(), "LOCAL SIMULATION ONLY");
-    let line = p.commands.iter().find(|c| c.contains("BREAKOUT")).unwrap();
+    let i = p
+        .commands
+        .iter()
+        .position(|c| c.contains("BREAKOUT"))
+        .unwrap();
+    let line = &p.commands[i];
     let parsed = sh_parse(line);
-    assert!(ops(&parsed).contains(&";"), "{line:?}");
-    assert!(words(&parsed).contains(&"printf"), "{line:?}");
+    assert!(ops(&parsed).is_empty(), "{line:?}");
+    assert!(!words(&parsed).contains(&"printf"), "{line:?}");
+    assert_eq!(words(&parsed).len(), 2, "{line:?}");
+    assert_eq!(p.argv[i][0], "echo");
+    assert!(p.argv[i][1].ends_with("x'; printf BREAKOUT; echo '"));
+    assert!(p.argv.iter().all(|a| a[0] == "echo" || a[0] == "true"));
 
     let mut item = teams::default_catalog()
         .into_iter()
@@ -346,16 +415,30 @@ fn documents_current_local_simulation_echo_breakout() {
     let p = item.as_proposal();
     assert_eq!(p.seal_banner(), "LOCAL SIMULATION ONLY");
     let parsed = sh_parse(&p.commands[0]);
-    assert!(words(&parsed).contains(&"printf"), "{:?}", p.commands[0]);
+    assert!(!words(&parsed).contains(&"printf"), "{:?}", p.commands[0]);
+    assert!(ops(&parsed).is_empty(), "{:?}", p.commands[0]);
+    assert_eq!(p.argv[0][0], "echo");
+    assert!(p.argv[0][1].ends_with("t'; printf BREAKOUT; echo '"));
+    // A tampered simulation line (not plain echo/true) is refused before
+    // any spawn, even with a valid approval. The `proposal_only=false`
+    // simulation path is the one that would otherwise reach a shell.
+    let mut bad = LockdownProposal::new("QA sim", vec!["echo 'a'; printf BREAKOUT".into()]);
+    bad.local_simulation = true;
+    let dir = tempdir("sim");
+    let log = ConsentLog::open_in(dir.join("consent")).unwrap();
+    let mut tok = log.approve(&bad).unwrap();
+    assert!(matches!(
+        execute_with_token(&bad, &mut tok),
+        Err(LockdownError::UnsafeCommand(_))
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// report.rs:134 wraps a line that is already single-quoted
-/// (`shell_single_quote`, report.rs:59-62, 172-174) in another `echo '..'`.
-/// The nesting puts the Biotek home path OUTSIDE quotes. That path comes from
-/// `$BIOTEK_HOME`, `$AETHER_HOME` or `~` (lillith-setup biotek.rs:54-71),
-/// so a space splits it and `$(..)` would be substituted.
+/// The Fish proposal echoes each helper line as ONE typed argv argument and
+/// the shown line quotes it correctly, so the Biotek home path (from
+/// `$BIOTEK_HOME`, `$AETHER_HOME` or `~`) is never split or substituted.
 #[test]
-fn documents_current_fish_proposal_nested_quotes_unquote_home() {
+fn fixed_fish_proposal_keeps_home_quoted() {
     let prof = report::DeviceProfile {
         hostname: "qa".into(),
         username: "qa".into(),
@@ -368,10 +451,30 @@ fn documents_current_fish_proposal_nested_quotes_unquote_home() {
     };
     let p = prof.fish_apply_proposal();
     assert!(p.local_simulation);
-    let line = p.commands.iter().find(|c| c.contains("BIOTEK_HOME")).unwrap();
+    let i = p
+        .commands
+        .iter()
+        .position(|c| c.contains("BIOTEK_HOME"))
+        .unwrap();
+    let line = &p.commands[i];
     let parsed = sh_parse(line);
-    assert!(parsed.cmd_subst, "{line:?}");
-    assert!(words(&parsed).iter().any(|w| *w == "home/$(printf"), "{line:?} -> {:?}", words(&parsed));
+    assert!(!parsed.cmd_subst, "{line:?}");
+    assert!(ops(&parsed).is_empty(), "{line:?}");
+    assert_eq!(
+        words(&parsed),
+        [
+            "echo",
+            "[QuantumSec] FISH PROPOSAL: set -gx BIOTEK_HOME '/tmp/qa home/$(printf X)'"
+        ],
+        "{line:?}"
+    );
+    assert_eq!(
+        p.argv[i],
+        [
+            "echo",
+            "[QuantumSec] FISH PROPOSAL: set -gx BIOTEK_HOME '/tmp/qa home/$(printf X)'"
+        ]
+    );
 }
 
 fn tempdir(tag: &str) -> std::path::PathBuf {

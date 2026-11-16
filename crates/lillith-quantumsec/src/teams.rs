@@ -104,23 +104,47 @@ pub struct TeamItem {
 
 impl TeamItem {
     /// Build a [`LockdownProposal`] for the blood seal (never executes here).
+    ///
+    /// LOCAL SIMULATION items become typed argv: the banner echoes the
+    /// catalog `title` as one literal argument, plain `echo '..'` / `true`
+    /// catalog lines keep their exact text, and any other catalog line is
+    /// only echoed (shown, not run). Nothing from `catalog.json` reaches a
+    /// shell. Non-simulation items keep their exact caller-authored lines.
     pub fn as_proposal(&self) -> LockdownProposal {
-        let mut cmds = self.commands.clone();
-        if self.local_simulation {
-            let banner = format!(
-                "echo '[QuantumSec] {} LOCAL SIMULATION: {}'",
+        let mut p = if self.local_simulation {
+            let banner_text = format!(
+                "[QuantumSec] {} LOCAL SIMULATION: {}",
                 self.team.label(),
                 self.title
             );
-            if cmds.first().map(|c| c.as_str()) != Some(banner.as_str()) {
-                cmds.insert(0, banner);
+            let mut argv: Vec<Vec<String>> = self
+                .commands
+                .iter()
+                .map(|c| {
+                    crate::lockdown::simple_sim_argv(c).unwrap_or_else(|| {
+                        vec![
+                            "echo".into(),
+                            format!("[QuantumSec] LOCAL SIMULATION (shown, not run): {c}"),
+                        ]
+                    })
+                })
+                .collect();
+            let banner = vec!["echo".to_string(), banner_text];
+            if argv.first() != Some(&banner) {
+                argv.insert(0, banner);
             }
-            if !cmds.iter().any(|c| c.trim() == "true") {
-                cmds.push("true".into());
+            if !argv.iter().any(|a| a.len() == 1 && a[0] == "true") {
+                argv.push(vec!["true".into()]);
             }
-        }
-        let mut p = LockdownProposal::new(format!("{} — {}", self.team.label(), self.title), cmds);
-        p.id = format!("{}-{}", self.id, p.proposed_unix);
+            LockdownProposal::from_argv(format!("{} — {}", self.team.label(), self.title), argv)
+        } else {
+            LockdownProposal::new(
+                format!("{} — {}", self.team.label(), self.title),
+                self.commands.clone(),
+            )
+        };
+        let suffix = p.id.trim_start_matches("lockdown-").to_string();
+        p.id = format!("{}-{}", self.id, suffix);
         p.local_simulation = self.local_simulation;
         p.proposal_only = self.proposal_only && !self.local_simulation;
         p
@@ -260,6 +284,26 @@ mod tests {
             );
             assert!(p.detail_block().contains("PROPOSAL, not run"));
         }
+    }
+
+    #[test]
+    fn red_sim_lines_keep_their_exact_text() {
+        let item = default_catalog()
+            .into_iter()
+            .find(|i| i.id == "red-sim-listeners")
+            .unwrap();
+        let p = item.as_proposal();
+        assert_eq!(
+            p.commands,
+            vec![
+                "echo '[QuantumSec] RED TEAM LOCAL SIMULATION: Simulate listener sweep'"
+                    .to_string(),
+                "echo '[QuantumSec] LOCAL SIMULATION: would scan listening sockets'".into(),
+                "echo '[QuantumSec] LOCAL SIMULATION: report → ~/.biotek/teams/red/'".into(),
+                "true".into(),
+            ]
+        );
+        assert_eq!(p.argv.len(), p.commands.len());
     }
 
     #[test]

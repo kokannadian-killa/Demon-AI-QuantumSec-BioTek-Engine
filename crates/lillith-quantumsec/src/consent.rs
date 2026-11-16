@@ -49,8 +49,14 @@ pub struct ConsentRecord {
     pub decision: ConsentDecision,
     /// Exact command block shown on the card.
     pub commands: Vec<String>,
-    /// Token nonce when approved (empty on deny).
+    /// Legacy field: older logs stored the token nonce here. The nonce is a
+    /// secret and is no longer written (always empty in new records).
+    #[serde(default)]
     pub token_nonce: String,
+    /// Non-secret SHA-256 binding digest of the exact proposal shown
+    /// (commands, argv, flags); see `LockdownProposal::binding_digest`.
+    #[serde(default)]
+    pub binding: String,
     /// Free-form summary.
     pub summary: String,
 }
@@ -88,7 +94,7 @@ impl ConsentLog {
 
     /// Record an approval for `proposal` and issue a [`ConsentToken`].
     pub fn approve(&self, proposal: &LockdownProposal) -> io::Result<ConsentToken> {
-        let token = ConsentToken::issue(&proposal.id);
+        let token = ConsentToken::issue(proposal)?;
         let rec = ConsentRecord {
             unix: now_unix(),
             ts: format_utc(SystemTime::now()),
@@ -96,7 +102,8 @@ impl ConsentLog {
             id: proposal.id.clone(),
             decision: ConsentDecision::Approve,
             commands: proposal.commands.clone(),
-            token_nonce: token.nonce.clone(),
+            token_nonce: String::new(),
+            binding: token.binding().to_string(),
             summary: proposal.summary.clone(),
         };
         self.append(&rec)?;
@@ -113,12 +120,17 @@ impl ConsentLog {
             decision: ConsentDecision::Deny,
             commands: proposal.commands.clone(),
             token_nonce: String::new(),
+            binding: proposal.binding_digest(),
             summary: proposal.summary.clone(),
         };
         self.append(&rec)
     }
 
     /// Record a generic gated action (bot deploy, hardening, …).
+    ///
+    /// `token_ref` is a **non-secret** reference such as
+    /// [`ConsentToken::binding`]; it is stored in [`ConsentRecord::binding`].
+    /// Never pass a token nonce here.
     pub fn record(
         &self,
         kind: &str,
@@ -126,7 +138,7 @@ impl ConsentLog {
         decision: ConsentDecision,
         summary: &str,
         commands: &[String],
-        token_nonce: &str,
+        token_ref: &str,
     ) -> io::Result<()> {
         let rec = ConsentRecord {
             unix: now_unix(),
@@ -135,7 +147,8 @@ impl ConsentLog {
             id: id.into(),
             decision,
             commands: commands.to_vec(),
-            token_nonce: token_nonce.into(),
+            token_nonce: String::new(),
+            binding: token_ref.into(),
             summary: summary.into(),
         };
         self.append(&rec)
@@ -301,6 +314,9 @@ mod tests {
         assert_eq!(lines.len(), 2);
         assert!(lines[0].contains("\"approve\""));
         assert!(lines[1].contains("\"deny\""));
+        // The secret nonce never reaches the log; the binding digest does.
+        assert!(!text.contains(&tok.nonce));
+        assert!(text.contains(tok.binding()));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
