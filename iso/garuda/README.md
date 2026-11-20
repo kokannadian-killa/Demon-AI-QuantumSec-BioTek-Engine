@@ -49,7 +49,8 @@ applied on top, and the full Lillith + QuantumSec + BioTek system ships unchange
 | examples installed | `garuda-dr460nized 5.0.4`, `garuda-common-settings 2.14.0`, `garuda-hooks 2.16.0`, `garuda-config-agent 1.1.0`, `garuda-fish-config`, `garuda-toolbox 6.3.0`, `garuda-setup-assistant`, `garuda-wallpapers`, `garuda-icons`, `linux-garuda 7.3.1-1`, `firedragon`, `kvantum`, `beautyline`, `chaotic-keyring`, `chaotic-mirrorlist`; 1313 packages in total |
 
 Left out of Garuda's list, with the reasons (also in the header of `packages.x86_64`):
-* `calamares-garuda`, `calamares-branding-garuda`: tied to miso and Garuda branding.
+* `calamares-branding-garuda`: Garuda branding (DemonOS ships its own branding).
+* (`calamares-garuda` was left out until 2026-11-19; it is now shipped, see "Installer" below.)
 * `garuda-tools-base-git`, `garuda-live-systemd`: miso live plumbing (archiso does the live boot).
 * `grub-theme-garuda-live`, `grub-theme-garuda-dr460nized`: Garuda trademark art, replaced by the DemonOS theme.
 * `garuda-dracut-support`, `dracut`: with dracut present, garuda-hooks skips mkinitcpio, but the archiso live initramfs needs mkinitcpio-archiso.
@@ -82,10 +83,30 @@ describe what it is built from.
 
 ## Differences from Garuda's live ISO (documented, on purpose)
 
-* The live boot is archiso's (`archisobasedir=demonos`, one `airootfs.sfs`), not miso. There is no Calamares installer.
+* The live boot is archiso's (`archisobasedir=demonos`, one `airootfs.sfs`), not miso. Until 2026-11-19 there was no installer; the release build ships Calamares with DemonOS's own config (see "Installer").
 * Networking is the tested DemonOS setup (systemd-networkd, iwd, resolved, with LLMNR and mDNS off). `avahi` and NetworkManager are installed but not enabled. Garuda's `profile.conf` service list isn't adopted.
 * `plasma-login-manager` (pulled in by `garuda-dr460nized`) is installed but not enabled. `display-manager.service` is SDDM.
 * garuda-hooks' `99-update-grub.hook` is masked *only during the build* by `/etc/pacman.d/hooks/99-update-grub.hook`. Otherwise it would run grub-mkconfig/os-prober against the build host's disks. releng's `zzzz99` hook deletes the mask, so the live system keeps Garuda's real hook.
+
+## Installer (2026-11-19, release/demonos-phantomcore-2026-11-19)
+
+The ISO is installable. It ships Garuda's Calamares build (`calamares-garuda`
+from `[garuda]`) with a DemonOS configuration written for the archiso layout
+(`airootfs/etc/calamares`), started from the menu or live desktop entry
+**Install DemonOS PhantomCore** (`/usr/local/bin/demonos-install` = `sudo -E calamares`).
+Nothing is written to a disk until Install is confirmed on Calamares' summary page.
+
+| step | what |
+|---|---|
+| pages | welcome, locale (default America/Edmonton, no GeoIP), keyboard, partition (ext4 default; btrfs with `@`, `@home`, `@cache`, `@log`; xfs; no LUKS), users, summary |
+| unpackfs | copies `/run/archiso/bootmnt/demonos/x86_64/airootfs.sfs` (the whole live system: Garuda Dr460nized + Lillith + QuantumSec + Biotek data-home support) |
+| shellprocess@copykernel | copies `vmlinuz-linux-garuda` and the microcode from the medium (mkarchiso empties `/boot` inside the squashfs) |
+| removeuser | removes the live user `demon` |
+| shellprocess@post | `demonos-installer-post`: removes live-only bits (NOPASSWD sudo, SDDM autologin, archiso mkinitcpio hooks + sshd drop-in, live units, volatile journal, installer launcher), writes a Plymouth initramfs hook list, initialises the pacman keyring on disk, locks an empty root password, re-applies DemonOS branding |
+| users, displaymanager (SDDM, DemonOS theme), networkcfg, hwclock, initcpio (`linux-garuda`), grubcfg, bootloader (GRUB; EFI id `DemonOS` + fallback) | standard Calamares modules |
+
+The new user gets the same first-run flow as the live user (Lillith autostart and
+the awakening/setup wizard from `/etc/skel`).
 
 ## Build
 
@@ -96,6 +117,7 @@ sudo iso/setup-arch-chroot.sh            # once (same chroot as iso/build-iso.sh
 nohup iso/garuda/build-garuda-iso.sh > build-garuda.out 2>&1 &
 ```
 
+0. With no verified ISO on disk to repack (or `LILLITH_FROM=source`), `chroot-build-garuda.sh` builds `lillith` from this checkout with the unmodified `linux/PKGBUILD` (needs the Git LFS art in `assets/generated`), runs `cargo test --release --workspace`, and removes the build trees and rust before mkarchiso.
 1. `build-garuda-iso.sh` (host) runs a preflight: free disk, `garuda.db` and `chaotic-aur.db` reachable (**if either is unreachable it stops and says so; nothing is faked**), the model, and the llama package. It then stages `iso/profile-garuda` with the model hardlinked in, bind-mounts, starts the same low-disk watcher as `build-iso.sh` (`ABORT_FREE_MB=1500`) and runs:
 2. `chroot-build-garuda.sh` (chroot) checks the key and mirrorlist, repacks and mtree-checks lillith, runs `repo-add`, generates the theme art (`iso/theme/make-theme-assets.py`) plus the DemonOS logo, start icon, fastfetch logo, LnF splash and GRUB theme for installs, and runs `mkarchiso -v -r`.
 3. Disk savers (this box had about 12 GB free):
