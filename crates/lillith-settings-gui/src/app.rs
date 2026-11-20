@@ -696,7 +696,7 @@ impl SettingsApp {
             pos2(r.right(), (a.bottom() + 8.0 + 120.0).min(r.bottom())),
         );
         if b.height() > 70.0 {
-            // Label was "AETHER_FLUX" before the Biotek Engine rename
+            // Label was renamed to BIOTEK_FLUX in the Biotek Engine rename
             // (docs/BIOTEK_TERMINOLOGY_MAP.md); the graph itself is unchanged.
             let gi = th::terminal_panel(&p, b, "BIOTEK_FLUX", Some("hz"));
             let n = 24;

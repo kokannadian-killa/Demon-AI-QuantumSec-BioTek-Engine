@@ -1,4 +1,4 @@
-//! Procedural gestures, ported from `aether_animator.py`.
+//! Procedural gestures, ported from `biotek_animator.py`.
 //!
 //! As of M2 every gesture has an authored clip in the generated set, played by
 //! [`crate::animator::Animator`] with an impulse from
@@ -7,7 +7,7 @@
 
 use std::str::FromStr;
 
-/// The aether_animator gesture library.
+/// The biotek_animator gesture library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Gesture {
     Float,

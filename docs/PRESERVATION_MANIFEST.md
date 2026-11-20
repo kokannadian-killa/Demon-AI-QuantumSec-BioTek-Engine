@@ -12,7 +12,7 @@ never in place of it. A regression check against this list is part of every phas
 | Member | Purpose (from Cargo.toml) |
 |---|---|
 | `crates/lillith-core` | Pure behaviour logic: events, commands, moods, springs, rules, config, right-click menu tree (`menu.rs`), Soul Contract consent gate (`soul_contract.rs`), access/command policy. No I/O. |
-| `crates/lillith-anim` | Atlas loader, clip player, procedural gestures (ported from `aether_animator.py`), particles. |
+| `crates/lillith-anim` | Atlas loader, clip player, procedural gestures (ported from `biotek_animator.py`), particles. |
 | `crates/lillith-overlay` | Transparent, always-on-top, click-through avatar overlay: wlr-layer-shell (KDE Plasma 6 Wayland) + winit/X11 fallback; tiny-skia right-click popup. |
 | `crates/lillith-sense` | System-monitor event sources: procfs/sysfs, desktop idle, notifications, KWin bridge (D-Bus), inotify, journald. |
 | `crates/lillith-mind` | SQLite memory, local LLM client (Ollama / llama-server), context builder, read-only tools. |
@@ -118,14 +118,14 @@ load real PNG art and fail only because the files are LFS pointers (`InvalidSign
 | Personalization report generator | **Absent**. |
 | Consent-gated deployment ("blood seal") | **Partial**: Soul Contract card is the existing gate; blood-seal bot-deploy dialog absent — build on top of Soul Contract. |
 | Bot registry / anon swarm | **Partial**: lillith-py bots (templates, store, API) exist; no swarm, no registry manifest dir. Tor: only lillith-learn online research. |
-| Biotek Engine data home `~/.biotek/` (mandate originally said `~/.aether/`; renamed by Ko) | **Absent** in repo (the only "aether" hits are the unrelated `aether_animator` gesture-port names). Created on the dev box in Phase 0. |
+| Biotek Engine data home `~/.biotek/` (mandate originally named a pre-Biotek data home; renamed by Ko) | **Absent** in repo. Created on the dev box in Phase 0. |
 | systemd user service | **Partial**: voice + lillith-py units exist; no unit for `lillith` itself / QuantumSec daemon. |
 | ISO / archiso / build-demonos / GRUB / Plymouth / SDDM theming | **Absent** (no archiso profile or ISO script in repo). |
 | PyQt6 code | **Absent** (mentioned only in docs/PLAN.md, FEATURES.md). |
 
 ## 12. Planned Biotek Engine data home `~/.biotek/` (spec only — the app creates dirs at runtime)
 
-Renamed from `~/.aether/` (Biotek Engine naming). New code must use `~/.biotek/`.
+Renamed from the pre-Biotek data home (Biotek Engine naming; the legacy literal lives only in the compat constants of `crates/lillith-setup/src/biotek.rs`). New code must use `~/.biotek/`.
 
 ```
 ~/.biotek/

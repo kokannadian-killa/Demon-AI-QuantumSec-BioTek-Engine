@@ -67,7 +67,7 @@ The 31 deleted lines (`main...integration`, without Cargo.lock) are all rewordin
 * test counts updated for the new menu items and tab;
 * help text and doc comments extended;
 * wizard "step N of 5" changed to 6;
-* the Aether → Biotek relabels listed in `docs/BIOTEK_TERMINOLOGY_MAP.md`;
+* the pre-Biotek → Biotek relabels listed in `docs/BIOTEK_TERMINOLOGY_MAP.md`;
 * the tray title `Lillith` → `Lillith · DemonOS`;
 * the About title `Lillith` kept, with an info rune beside it;
 * the consent-card glyphs `⛧ ✕ ✓` changed to `⚠` / plain text, because those glyphs rendered as tofu boxes on the DemonOS font. The buttons and their behaviour are unchanged.

@@ -27,7 +27,7 @@ Scope: the desktop companion (avatar, animation, interactions), the system state
 
 - **Target machine** (from `lillith_os_v2`): HP Spectre x360, i5-7200U, Intel HD 620, **Garuda Linux, KDE Plasma 6, Wayland**, fish shell. Local model file: `/home/ko-terminal/AI/models/dolphin3.0-llama3.2-3b-q4_k_m.gguf` (Modelfile).
 - **The best behaviour spec** is `source/LILLITH_README_spring_physics_edition.md`: springs, moods, mischief, sleep/wake, key map, sounds, memory, Ollama chat, TTS, STT, proactive talk, and system tools. Its Python implementation was not attached, so the Rust version is built from the spec.
-- **Working Python modules to port 1:1:** `lillith_memory_sqlite.py`, `lillith_tts_engine.py`, `lillith_voice_input.py`, `aether_gesture_map.py`, `aether_animator.py`, `mod_reactions.py`, and the v01 interaction model.
+- **Working Python modules to port 1:1:** `lillith_memory_sqlite.py`, `lillith_tts_engine.py`, `lillith_voice_input.py`, `biotek_gesture_map.py`, `biotek_animator.py`, `mod_reactions.py`, and the v01 interaction model.
 - **Assets:** 6 alpha sheets (3×10, 1792×1008), 52 single-pose stills (grey background), a left-run 4×3 sheet and reference sheets (baked checkerboard), 4 idle-physics keyframe refs, and 80 black-background video frames.
 - **Prior Rust intent** (GH#6): Axum + sqlx/SQLite + reqwest to `llama-server` :8080 (chatml), Ollama as the alternative, "egui + tray" for the window. GH#2: a llama.cpp CLI. No Rust code exists anywhere; the user's repo `Lillith-Desktop-Avatar` holds only a 2-line README (§R). Toolchain on the box: cargo/rustc 1.85.1.
 
@@ -58,7 +58,7 @@ The TSX files (`LillithStage.tsx`, TanStack routes, "Lillith 2029") are a browse
 lillith/                          Cargo workspace
 ├─ crates/
 │  ├─ lillith-core/     pure logic: state machine, moods, mischief, springs, rules, config (no I/O, unit-tested with fake clock)
-│  ├─ lillith-anim/     atlas loader, clip player, procedural gestures (port of aether_animator), particles
+│  ├─ lillith-anim/     atlas loader, clip player, procedural gestures (port of biotek_animator), particles
 │  ├─ lillith-overlay/  layer-shell window (sctk) + winit/X11 fallback, input region, drag, speech bubbles
 │  ├─ lillith-sense/    monitors → Event bus (sysinfo, zbus: UPower/NM/BlueZ/UDisks/Notifications, inotify, journald, KWin bridge)
 │  ├─ lillith-mind/     memory (rusqlite port), LLM client (Ollama + OpenAI-compatible llama-server), context builder, read-only tools
@@ -78,7 +78,7 @@ lillith/                          Cargo workspace
 - **Overlay surface.** `zwlr_layer_shell_v1` on layer `Overlay`, anchored bottom+left. Exclusive zone −1. Keyboard interactivity `OnDemand`, so keys reach her only when she is focused (README key map) **(verify on KWin 6)**.
 - **Moving her.** Layer surfaces are positioned by **margins**. Drag is pointer-grab plus margin updates. Walk and patrol animate the margins.
 - **Click-through.** Precompute per-frame alpha masks as row runs at build time and set them as the input region on every frame change.
-- **What Wayland hides from clients:** the global cursor, other windows' titles and geometry, and global keys. Add a small **KWin script** that pushes `workspace.windowAdded/windowRemoved/windowActivated`, minimize changes, frame geometry and polled `workspace.cursorPos` (~10 Hz while awake) to `org.lillith.Bridge` via `callDBus`. This replaces `wmctrl`/`xdotool` from `aether_event_watcher.py` and enables title-bar perching, window open/close gestures, Follow mode and proximity wake **(verify Plasma 6 KWin API names)**.
+- **What Wayland hides from clients:** the global cursor, other windows' titles and geometry, and global keys. Add a small **KWin script** that pushes `workspace.windowAdded/windowRemoved/windowActivated`, minimize changes, frame geometry and polled `workspace.cursorPos` (~10 Hz while awake) to `org.lillith.Bridge` via `callDBus`. This replaces `wmctrl`/`xdotool` from `biotek_event_watcher.py` and enables title-bar perching, window open/close gestures, Follow mode and proximity wake **(verify Plasma 6 KWin API names)**.
 - **Global shortcuts** (chat, push-to-talk): xdg-desktop-portal GlobalShortcuts via `ashpd`, with tray items as fallback. This replaces `pynput`, which README-DK notes is limited on Wayland.
 - **Screenshot** for "What do you see?": `ashpd` Screenshot portal, or `spectacle -b -n -o` as in `lillith_os_v2`.
 - **Idle:** `ext-idle-notify-v1`, or `org.freedesktop.ScreenSaver` D-Bus.
@@ -89,7 +89,7 @@ lillith/                          Cargo workspace
 | Python behaviour / dependency | Rust crate(s) |
 |---|---|
 | Tk/pygame frameless topmost alpha window | `smithay-client-toolkit`, `wayland-client`. Fallback `winit` + `softbuffer` |
-| PIL rotate/scale/tint/paste (apply_transform, aether_animator) | `tiny-skia`, `image`, `fast_image_resize`. Optional `wgpu` |
+| PIL rotate/scale/tint/paste (apply_transform, biotek_animator) | `tiny-skia`, `image`, `fast_image_resize`. Optional `wgpu` |
 | Speech bubble text | `cosmic-text` (or `ab_glyph`) |
 | psutil CPU/RAM/disk/procs/temps/uptime/load | `sysinfo` |
 | Battery | `zbus` → UPower (event-driven). Alternative `starship-battery` |
@@ -121,14 +121,14 @@ lillith/                          Cargo workspace
 ### 3.1 Layers
 
 1. **Base / locomotion state** (exclusive): `Idle{Sitting|Standing}`, `Walking{dir}`, `Running{dir}`, `Perched{window}`, `Dragged`, `Sleepy`, `Asleep`, `Hidden`. Movement modes from GH#1 / P2-M ("Mote") are **Wander** (patrol the floor), **Follow** (cursor via KWin bridge), **Stay**, plus the stretch verbs climb-window-side, sit-on-ledge, ride-a-dragged-window, pet-on-tap and pick-up/throw.
-2. **Reaction layer.** One-shot pose or clip with `priority`, `duration`, `cooldown`, `interruptible`, optional line and SFX. A priority queue replaces v01's `is_reacting` flag. There is a global auto-gesture cooldown of 2.5 s (from `aether_avatar_window`).
+2. **Reaction layer.** One-shot pose or clip with `priority`, `duration`, `cooldown`, `interruptible`, optional line and SFX. A priority queue replaces v01's `is_reacting` flag. There is a global auto-gesture cooldown of 2.5 s (from `biotek_avatar_window`).
 3. **Idle life.** Breathing period 3.5–4.5 s. Blink every 4–6 s. An idle transition every 8–12 s lasting 1.2–2 s (hip sway, lean-forward, shoulder roll, hips shift, soft reset, per physics refs A–D). Random idle reactions every 12–26 s. Pose cycle every 16 s (README-SP defaults).
 4. **Mood & drives.** Moods are Playful, Happy, Mischievous, Alert and Sleepy, each with a strength. The mischief meter rises while she is ignored and fires a playful interruption at a threshold. Inactivity moves her Sleepy → Asleep, and proximity or a click wakes her. Warmth and greeting style come from memory.
 5. **Physics (render side).** One spring-damper per channel: root x/y, angle, scale, chest, pigtails. README-SP defaults (stiffness/damping): chest 65/9.5, pig 32/6.5, root 48/10, angle 42/9, scale 55/11. Gains: jiggle 0.6, chest_bounce 1.0, pigtail_sway 0.9. Semi-implicit Euler at 120 Hz with velocity clamping. Reactions apply **impulses** in place of the v01–v12 random jitter. With single-image poses, the chest and pigtail channels can only be applied as subtle whole-sprite squash/offset until layered art exists **(design note)**.
 
 ### 3.2 Event → reaction rules (`assets/rules.toml`, data-driven)
 
-Poses use clean names from `lillith_pose_map.txt`. Gestures use `aether_animator` names. Lines come from LillithStage.tsx and gesture_map.py. SFX cues come from README_SOUNDS. Thresholds marked (guess) are new.
+Poses use clean names from `lillith_pose_map.txt`. Gestures use `biotek_animator` names. Lines come from LillithStage.tsx and gesture_map.py. SFX cues come from README_SOUNDS. Thresholds marked (guess) are new.
 
 | Event | Pose / clip | Gesture | Example line | Mood | SFX |
 |---|---|---|---|---|---|
@@ -175,19 +175,19 @@ Repo baseline: the repo has nothing to port from. Every target module below is n
 | v01 `CyberDemonAvatar` (bindings, hover phases, drag, timers) | `core::interaction`, `overlay::input` | Fixes these known bugs: blocking `pygame.time.wait` and the never-shown reaction image (v10–v12), `_start_all_systems` / `_setup_bindings` mismatches (v08/v09), `drag_x` uninitialised (v07), missing `import os` (mod_config) |
 | `mod_reactions.py`, CreationImagesNeeded | `rules.toml` + `core::rules` | |
 | `mod_system_monitor.py` | `sense::cpu` (sysinfo, 5 s, hysteresis + cooldown) | |
-| `aether_event_watcher.py` (wmctrl) | `sense::kwin` (D-Bus fed by the KWin script). `x11rb` on X11 | |
-| `aether_gesture_map.py` | `rules.toml [window.*]` | copy the app-category lists verbatim |
-| `aether_animator.py` | `anim::gestures` | easing and tweens become spring targets/impulses |
-| `aether_avatar_window.py` | `overlay::{bubble, walk, menu}` | 2 px/tick patrol becomes a margin animation |
-| `aether_image_loader.py`, `aether_body_segmenter.py` | `tools/slice-sheets` | rembg stays in the offline tooling |
+| `biotek_event_watcher.py` (wmctrl) | `sense::kwin` (D-Bus fed by the KWin script). `x11rb` on X11 | |
+| `biotek_gesture_map.py` | `rules.toml [window.*]` | copy the app-category lists verbatim |
+| `biotek_animator.py` | `anim::gestures` | easing and tweens become spring targets/impulses |
+| `biotek_avatar_window.py` | `overlay::{bubble, walk, menu}` | 2 px/tick patrol becomes a margin animation |
+| `biotek_image_loader.py`, `biotek_body_segmenter.py` | `tools/slice-sheets` | rembg stays in the offline tooling |
 | `mod_tray.py` | `lillith-tray` (ksni) | |
 | `mod_config.py`, config_A/B, README-SP keys | `core::config` (TOML, same keys) | |
 | `lillith_memory_sqlite.py` | `mind::memory` (rusqlite + regex) | same schema. DB at `~/.local/share/lillith/lillith_memory.db` |
-| `lillith_tts_engine.py`, `aether_tts.py` | `voice::tts` | same chain. espeak `en+f3 -s145 -p50` |
-| `lillith_voice_input.py`, `aether_stt.py` | `voice::stt` | subprocess first. `pw-record` preferred on PipeWire (guess) |
+| `lillith_tts_engine.py`, `biotek_tts.py` | `voice::tts` | same chain. espeak `en+f3 -s145 -p50` |
+| `lillith_voice_input.py`, `biotek_stt.py` | `voice::stt` | subprocess first. `pw-record` preferred on PipeWire (guess) |
 | `lillith_os_v2.py` (PyQt6, OpenVINO/optimum-intel on HD 620, temp 0.7/150 tok, spectacle vision) | `mind::llm` trait: `Ollama`, `OpenAiCompat` (llama-server) | v1 runs the Dolphin-3 3B Q4 on CPU. OpenVINO on the HD 620 is a stretch (P2-§2) |
 | GH#6 `lillith-local` Axum `/chat` | optional `axum` API on 127.0.0.1 | only if a web panel or phone client is wanted |
-| `aether_movement_learner.py` | deferred | stretch goal |
+| `biotek_movement_learner.py` | deferred | stretch goal |
 | `LillithStage.tsx` | egui stage/debug panel design | |
 
 ## 4. Asset pipeline (`tools/slice-sheets`)
@@ -304,7 +304,7 @@ Folded into the milestones. The chat pieces largely exist on branch `feat/chat-b
 | Live chat / conversation view (scrollable transcript) | M7 | A separate egui chat window: message history, input box, streaming reply. Reuses `lillith-panel` |
 | Interface bubble / chat window toggle | M7 | Open via right-click menu item "Chat" and the `Y`/`Enter` key; closeable, remembers position |
 | Right-click access to the GUI options menu | M6 ▶ | The right-click menu (being wired now) gains an "Open interface / GUI options" item that raises the egui settings/chat window |
-| First-run setup wizard | M6 | On first launch: detect Ollama / llama-server, scan for local `.gguf` models, pick one, test it, write config. Modeled on the old Aether `aether_main_v2.py` first-run wizard (model scanner + Modelfile editor) |
+| First-run setup wizard | M6 | On first launch: detect Ollama / llama-server, scan for local `.gguf` models, pick one, test it, write config. Modeled on the old Biotek `biotek_main_v2.py` first-run wizard (model scanner + Modelfile editor) |
 | GGUF model picker | M6 | Scan `~/.local/share`, Ollama's model dir, and a user path for `*.gguf`; list name/size/quant; choose the default; store in `[llm]` config |
 | Modelfile customizer | M6 | Edit the Ollama Modelfile / system prompt + params (temperature, context, stop tokens) in the wizard and in settings; save and (re)create the model |
 
@@ -324,7 +324,7 @@ Folded into the milestones. The chat pieces largely exist on branch `feat/chat-b
 3. **Mouse mapping.** Double-click = knife (v01, GH#4) or hacking (README-SP)? Right-click = cleaning or the pose menu (GH#4)?
 4. **LLM backend.** Ollama (README-SP/DK, Modelfile) or `llama-server` (GH#6)? Is the default model `dolphin3.0-llama3.2-3b-q4_k_m.gguf` or `llama3.2:3b`? Is OpenVINO/optimum-intel on the HD 620 worth pursuing (confirmed working in `lillith_os_v2.py`, P2-§2)?
 5. **Missing files / repo.** Should the Python prototypes and curated assets be committed to the repo as `legacy/` and `assets/source/` for reference? Can the repo be granted to the Cursor GitHub App? Are `TA_TheAttendant` or `BoiTekEngine` meant to be reused (e.g. for the LLM server)?
-   Also: Can you supply `lillith_avatar.py` and its 205–221 image `poses/` folder, the Aether package internals, and the Rust code from GH#2/#6? They would shorten M2–M3 and M7.
+   Also: Can you supply `lillith_avatar.py` and its 205–221 image `poses/` folder, the Biotek package internals, and the Rust code from GH#2/#6? They would shorten M2–M3 and M7.
 6. **Window behaviour.** Should she be allowed to walk over fullscreen apps, or hide automatically during fullscreen/games? Should she stay on all virtual desktops?
 7. **Event priorities.** Which system events should she react to by default, and which should be quiet indicators? Is there a do-not-disturb mode?
 8. **Firewall.** Which one is in use (firewalld, ufw, or plain nftables)? This decides the `firewall.blocked` source.
@@ -332,5 +332,5 @@ Folded into the milestones. The chat pieces largely exist on branch `feat/chat-b
 10. **Platforms.** Linux/Wayland only for v1, or are the Windows/Android notes in README-DK in scope later?
 11. **Grok pass 2.** Fold in `grok_history_pass2.md` when it lands (unopened chats include "Build Rust Application from Grok Link" and "Rust Project Prompt Creator for Multi-OS").
 12. **Installer.** Is `Lillith-The-Master-Setup.iss` (Inno Setup, Windows, `tools\launch.bat`) still wanted, given the Linux-first plan? Its contents weren't retrieved.
-13. **Branding verdict.** Three brand passes exist: "Lillith 2029" (PASS, og.jpg, #C026D3 / #120014), "Lilith" (card FAILED), "Aether Companion" (PASS). Which is canonical for the Rust app?
+13. **Branding verdict.** Three brand passes exist: "Lillith 2029" (PASS, og.jpg, #C026D3 / #120014), "Lilith" (card FAILED), "Biotek Companion" (PASS). Which is canonical for the Rust app?
 14. **Unretrieved project content.** The `imagine_images/` and `browsed_files/` folders and the `.iss` file in the Grok "lillith" project were not opened. Should I pull them on a later pass?

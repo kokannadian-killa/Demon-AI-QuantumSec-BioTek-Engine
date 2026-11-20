@@ -1,13 +1,20 @@
 //! Biotek Engine data home (`~/.biotek`), with a read fallback to and a
-//! one-time, copy-only migration from the legacy `~/.aether` home.
+//! one-time, copy-only migration from the legacy pre-Biotek data home.
+//!
+//! LEGACY-COMPAT: the only places the old pre-Biotek name may still appear
+//! in this repo are the literal values of [`LEGACY_HOME_ENV`],
+//! [`LEGACY_DIR_NAME`], [`LEGACY_MIGRATION_MARKER`] and the deprecated
+//! aliases at the bottom of this compat block. They exist so an existing
+//! install keeps working (its old directory is migrated, its old env var is
+//! honoured). Everything else is named Biotek.
 //!
 //! See `docs/BIOTEK_TERMINOLOGY_MAP.md`. Std only. Nothing here deletes,
 //! moves or overwrites anything under the legacy home: migration copies
-//! files that are missing in `~/.biotek` and leaves `~/.aether` intact.
+//! files that are missing in `~/.biotek` and leaves the legacy home intact.
 //!
 //! Resolution order for the data home ([`biotek_home`]):
 //! 1. `$BIOTEK_HOME` (absolute, non-empty)
-//! 2. `$AETHER_HOME` (deprecated alias, absolute, non-empty)
+//! 2. [`LEGACY_HOME_ENV`] (deprecated pre-Biotek alias, absolute, non-empty)
 //! 3. `~/.biotek`
 //!
 //! The layout is the Phase 0 spec in `docs/PRESERVATION_MANIFEST.md` §12.
@@ -19,14 +26,19 @@ use std::path::{Path, PathBuf};
 
 /// Primary env var for the data home.
 pub const BIOTEK_HOME_ENV: &str = "BIOTEK_HOME";
-/// Deprecated alias of [`BIOTEK_HOME_ENV`]; still honoured.
-pub const LEGACY_AETHER_HOME_ENV: &str = "AETHER_HOME";
+/// LEGACY-COMPAT: deprecated pre-Biotek alias of [`BIOTEK_HOME_ENV`]; still
+/// honoured as a fallback so old environments keep working. Literal kept on purpose.
+pub const LEGACY_HOME_ENV: &str = "AETHER_HOME";
 /// Primary data-home directory name under `$HOME`.
 pub const BIOTEK_DIR_NAME: &str = ".biotek";
-/// Legacy data-home directory name under `$HOME` (read fallback only).
-pub const LEGACY_AETHER_DIR_NAME: &str = ".aether";
+/// LEGACY-COMPAT: pre-Biotek data-home directory name under `$HOME` (read
+/// fallback and migration source only). Literal kept on purpose.
+pub const LEGACY_DIR_NAME: &str = ".aether";
 /// Marker written into the new home after a migration pass.
-pub const MIGRATION_MARKER: &str = ".migrated-from-aether";
+pub const MIGRATION_MARKER: &str = ".migrated-from-legacy-home";
+/// LEGACY-COMPAT: marker name written by earlier builds; still recognised so
+/// an already-migrated home is not migrated a second time.
+pub const LEGACY_MIGRATION_MARKER: &str = ".migrated-from-aether";
 
 /// Sub-directories of the data home (relative paths).
 pub const LAYOUT: &[&str] = &[
@@ -53,30 +65,31 @@ fn env_abs(k: &str) -> Option<PathBuf> {
 /// The data-home rule from explicit values (testable without touching env).
 pub fn biotek_home_from(
     biotek_env: Option<PathBuf>,
-    aether_env: Option<PathBuf>,
+    legacy_env: Option<PathBuf>,
     home: Option<PathBuf>,
 ) -> Option<PathBuf> {
     biotek_env
-        .or(aether_env)
+        .or(legacy_env)
         .or_else(|| home.map(|h| h.join(BIOTEK_DIR_NAME)))
 }
 
-/// `$BIOTEK_HOME`, else `$AETHER_HOME` (deprecated), else `~/.biotek`.
+/// `$BIOTEK_HOME`, else [`LEGACY_HOME_ENV`] (deprecated), else `~/.biotek`.
 pub fn biotek_home() -> Option<PathBuf> {
     biotek_home_from(
         env_abs(BIOTEK_HOME_ENV),
-        env_abs(LEGACY_AETHER_HOME_ENV),
+        env_abs(LEGACY_HOME_ENV),
         crate::paths::home_dir(),
     )
 }
 
-/// `~/.aether` (legacy home; read fallback and migration source only).
-pub fn legacy_aether_home() -> Option<PathBuf> {
-    crate::paths::home_dir().map(|h| h.join(LEGACY_AETHER_DIR_NAME))
+/// The legacy pre-Biotek home ([`LEGACY_DIR_NAME`]; read fallback and
+/// migration source only).
+pub fn legacy_home() -> Option<PathBuf> {
+    crate::paths::home_dir().map(|h| h.join(LEGACY_DIR_NAME))
 }
 
-/// Deprecated alias of [`biotek_home`] for any caller written against the
-/// original `~/.aether` mandate. Returns the Biotek home, not `~/.aether`.
+/// LEGACY-COMPAT: deprecated alias of [`biotek_home`] for any caller written
+/// against the original pre-Biotek mandate. Returns the Biotek home.
 #[deprecated(note = "use biotek::biotek_home (data home renamed to ~/.biotek)")]
 pub fn aether_home() -> Option<PathBuf> {
     biotek_home()
@@ -98,7 +111,7 @@ pub fn resolve_read_in(new: &Path, legacy: Option<&Path>, rel: &str) -> PathBuf 
 /// [`resolve_read_in`] for the real homes.
 pub fn resolve_read(rel: &str) -> Option<PathBuf> {
     let new = biotek_home()?;
-    Some(resolve_read_in(&new, legacy_aether_home().as_deref(), rel))
+    Some(resolve_read_in(&new, legacy_home().as_deref(), rel))
 }
 
 /// Create the [`LAYOUT`] directories under `home` (idempotent).
@@ -121,10 +134,14 @@ pub struct MigrationReport {
 /// One-time, non-destructive migration: copy every file under `legacy` that
 /// does not yet exist under `new`. Never overwrites, never deletes, never
 /// follows symlinks out of the tree. Writes [`MIGRATION_MARKER`] into `new`
-/// and is a no-op once that marker exists or `legacy` is absent.
+/// and is a no-op once that marker (or [`LEGACY_MIGRATION_MARKER`]) exists
+/// or `legacy` is absent.
 pub fn migrate_in(legacy: &Path, new: &Path) -> io::Result<MigrationReport> {
     let mut report = MigrationReport::default();
-    if !legacy.is_dir() || new.join(MIGRATION_MARKER).exists() {
+    if !legacy.is_dir()
+        || new.join(MIGRATION_MARKER).exists()
+        || new.join(LEGACY_MIGRATION_MARKER).exists()
+    {
         return Ok(report);
     }
     std::fs::create_dir_all(new)?;
@@ -169,15 +186,21 @@ fn copy_missing(
 }
 
 /// [`migrate_in`] for the real homes, then [`ensure_layout_in`].
-pub fn migrate_from_aether() -> io::Result<MigrationReport> {
+pub fn migrate_legacy_home() -> io::Result<MigrationReport> {
     let new = biotek_home()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no home directory"))?;
-    let report = match legacy_aether_home() {
+    let report = match legacy_home() {
         Some(old) if old != new => migrate_in(&old, &new)?,
         _ => MigrationReport::default(),
     };
     ensure_layout_in(&new)?;
     Ok(report)
+}
+
+/// LEGACY-COMPAT: deprecated alias of [`migrate_legacy_home`] (old name).
+#[deprecated(note = "use biotek::migrate_legacy_home")]
+pub fn migrate_from_aether() -> io::Result<MigrationReport> {
+    migrate_legacy_home()
 }
 
 // ---------------------------------------------------------------------------
@@ -495,6 +518,13 @@ mod tests {
         for d in LAYOUT {
             assert!(new.join(d).is_dir());
         }
+
+        // A home migrated by an earlier build (old marker name) is not migrated again.
+        let new2 = root.join("new2");
+        std::fs::create_dir_all(&new2).unwrap();
+        std::fs::write(new2.join(LEGACY_MIGRATION_MARKER), "earlier build").unwrap();
+        assert_eq!(migrate_in(&old, &new2).unwrap(), MigrationReport::default());
+        assert!(!new2.join("consent/log.jsonl").exists());
         let _ = std::fs::remove_dir_all(root);
     }
 

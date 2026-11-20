@@ -1,4 +1,4 @@
-# Biotek Engine terminology map (Aether → Biotek Engine)
+# Biotek Engine terminology map (pre-Biotek name → Biotek Engine)
 
 Branch: `biotek/terminology` (off `quantumsec/integration` @ `e0248a6`).
 Scope: Lillith OS + QuantumSec (this repo). Rules: additive, non-breaking,
@@ -36,14 +36,19 @@ The only pinned local runtime is **llama.cpp `b11829`** (commit
 
 | Source | What it shows |
 |---|---|
-| GitHub `kokannadian-killa/BoiTekEngine` (public, Rust, last push 2026-07-07; note the repo name is spelled **BoiTek**) | The existing Biotek Engine project. Crate/binary `biotekengine`, brand `BIOTEKENGINE`, config `config/biotekengine.toml`, systemd `biotekengine.service` + `biotekengine-backup.{service,timer}`, env prefix `BIOTEKENGINE_` (see §4), user dot-dir `~/.biotekengine/` / CWD `.biotekengine/`, metrics prefix `biotekengine_*`, GUI `gui/biotekengine.html` (+ legacy `gui/aethermind.html`), ports 8080 (static GUI) / 8765 (WebSocket) / 9090 (Prometheus). Its message bus module is still called `aether_core` / `AetherCore` ("Nervous System"). |
-| `docs/PRESERVATION_MANIFEST.md` §12 (this repo) | Phase 0 data-home spec, renamed by Ko from `~/.aether/` to `~/.biotek/`. |
-| `~/.biotek/README.md` on the dev box (Phase 0) | Same layout as §12. `~/.aether/` also exists there (Phase 0 original, same layout, left in place). |
+| GitHub `kokannadian-killa/BoiTekEngine` (public, Rust, last push 2026-07-07; note the repo name is spelled **BoiTek**) | The existing Biotek Engine project. Crate/binary `biotekengine`, brand `BIOTEKENGINE`, config `config/biotekengine.toml`, systemd `biotekengine.service` + `biotekengine-backup.{service,timer}`, env prefix `BIOTEKENGINE_` (see §4), user dot-dir `~/.biotekengine/` / CWD `.biotekengine/`, metrics prefix `biotekengine_*`, GUI `gui/biotekengine.html` (+ a legacy pre-Biotek-named GUI page), ports 8080 (static GUI) / 8765 (WebSocket) / 9090 (Prometheus). Its message bus module ("Nervous System") still carries an upstream pre-Biotek name; renaming it is upstream's call. |
+| `docs/PRESERVATION_MANIFEST.md` §12 (this repo) | Phase 0 data-home spec, renamed by Ko from the pre-Biotek data home to `~/.biotek/`. |
+| `~/.biotek/README.md` on the dev box (Phase 0) | Same layout as §12. The pre-Biotek Phase 0 original also exists there (same layout, left in place). |
 | `lillith/grok_history*.md` (dev box notes) | "BIOTEKENGINE, a mycelial organism desktop icon (Rust core, quantum branches, self-edits KEEP/REVERT logged)". |
 
-No `~/.aether` path, `AETHER_*` env var, `aether.*` config key, `aether*` unit or
-`aether*` file name exists in any branch of this repo (checked with `git grep -i aether`
-across all 170 `origin/*` refs; `quantumsec/integration` is a superset of every hit).
+**2026-11-19 (release/demonos-phantomcore-2026-11-19, on Ko's instruction "change
+every mention to biotek"):** every remaining pre-Biotek mention in code, docs, comments,
+data tags and prototype file references was renamed to Biotek (case-preserving). The old
+literal survives **only** in the clearly marked `LEGACY-COMPAT` block of
+`crates/lillith-setup/src/biotek.rs` (legacy dir name, legacy env var, old migration
+marker, two `#[deprecated]` aliases), so existing installs keep migrating and old
+environments keep working. A case-insensitive `rg` for the old name outside that file and the ISO guest check
+(which looks for the literal on purpose) is empty.
 
 ## 2. Casing rules
 
@@ -64,21 +69,21 @@ left alone; it is not ours to rename here).
 
 | Old | New | Status / compat |
 |---|---|---|
-| `~/.aether/` (Phase 0 mandate) | `~/.biotek/` | primary = `~/.biotek`; reads fall back to `~/.aether/<rel>`; one-time copy-only migration (§5) |
-| `$AETHER_HOME` (implied by the mandate; never used in code) | `$BIOTEK_HOME` | `AETHER_HOME` still honoured as a deprecated alias |
-| `AETHER_*` env prefix (none existed) | `BIOTEK_*` | reserve `BIOTEK_` for Lillith/QuantumSec; do not reuse `BIOTEKENGINE_` (upstream engine's) |
-| `aether_home()` (mandate wording) | `biotek::biotek_home()` | `biotek::aether_home()` kept, `#[deprecated]`, returns the Biotek home |
-| GUI label `AETHER_FLUX` (settings GUI, decorative flux graph) | `BIOTEK_FLUX` | label text only; graph unchanged |
-| "old Aether key `num_ctx`" (`[llm]`) | `ctx_size` | unchanged behaviour: `num_ctx` still read as alias, `ctx_size` wins (wording updated only) |
-| systemd unit names | none to rename | Lillith units are `lillith-*`; no `aether*` unit exists. Future QuantumSec unit: `lillith-quantumsec.service` (user unit), not `biotek*` (that namespace belongs to the upstream engine) |
+| legacy pre-Biotek home (`biotek::LEGACY_DIR_NAME`, Phase 0 mandate) | `~/.biotek/` | primary = `~/.biotek`; reads fall back to the legacy home; one-time copy-only migration (§5) |
+| legacy home env var (`biotek::LEGACY_HOME_ENV`; implied by the mandate) | `$BIOTEK_HOME` | still honoured as a deprecated fallback |
+| pre-Biotek env prefix (none existed) | `BIOTEK_*` | reserve `BIOTEK_` for Lillith/QuantumSec; do not reuse `BIOTEKENGINE_` (upstream engine's) |
+| old-name home fn (mandate wording) | `biotek::biotek_home()` | old name kept in the LEGACY-COMPAT block, `#[deprecated]`, returns the Biotek home |
+| old flux GUI label (settings GUI, decorative flux graph) | `BIOTEK_FLUX` | label text only; graph unchanged |
+| "old pre-Biotek key `num_ctx`" (`[llm]`) | `ctx_size` | unchanged behaviour: `num_ctx` still read as alias, `ctx_size` wins (wording updated only) |
+| systemd unit names | none to rename | Lillith units are `lillith-*`; no pre-Biotek-named unit exists. Future QuantumSec unit: `lillith-quantumsec.service` (user unit), not `biotek*` (that namespace belongs to the upstream engine) |
 | ISO / archiso scripts | none exist yet | new ISO code must use `~/.biotek` via `lillith_setup::biotek` semantics (§6) |
-| Config keys | none `aether.*` | new QuantumSec settings go in `~/.biotek/config/*.toml`, never in `~/.config/lillith/config.toml` |
-| File / dir names | none contain `aether` | no `git mv` needed |
+| Config keys | none with the pre-Biotek prefix | new QuantumSec settings go in `~/.biotek/config/*.toml`, never in `~/.config/lillith/config.toml` |
+| File / dir names | none carried the pre-Biotek name | no `git mv` needed |
 
 ## 4. Data home layout (`~/.biotek/`, matches Phase 0 exactly)
 
 ```
-~/.biotek/                 ($BIOTEK_HOME, else $AETHER_HOME [deprecated], else ~/.biotek)
+~/.biotek/                 ($BIOTEK_HOME, else the legacy env var [deprecated], else ~/.biotek)
 ├── README.md
 ├── config/                QuantumSec / teams / swarm settings
 ├── logs/                  shield + exercise logs (rotated)
@@ -129,7 +134,7 @@ Two resolvers in `lillith_setup::biotek`, deliberately separate:
 | | Lillith data home | Upstream Biotek Engine (`biotekengine`) |
 |---|---|---|
 | Resolver | `biotek_home()` | `engine_paths()` → `EnginePaths` |
-| Root | `$BIOTEK_HOME` → `$AETHER_HOME` (deprecated) → `~/.biotek` | work dir `<biotek home>/engine` (= `%h/.biotek/engine` in a user unit) |
+| Root | `$BIOTEK_HOME` → legacy env var (deprecated) → `~/.biotek` | work dir `<biotek home>/engine` (= `%h/.biotek/engine` in a user unit) |
 | Config | `~/.biotek/config/*.toml` | `$BIOTEKENGINE_CONFIG` → `<work_dir>/config/biotekengine.toml` |
 | Data | layout in §4 | `$BIOTEKENGINE_DATA_DIR` → `<work_dir>/data` |
 | Models | Lillith's own GGUF scan paths, **plus `~/.biotekengine/models`** (added last in `scan::default_scan_dirs`; older paths unchanged) | `~/.biotekengine/models` (`$HOME`-relative upstream) |
@@ -146,22 +151,26 @@ Lillith creates or writes engine paths.
 
 ## 5. Fallback / migration behaviour (`crates/lillith-setup/src/biotek.rs`)
 
-* `biotek_home()`: `$BIOTEK_HOME` → `$AETHER_HOME` (deprecated) → `~/.biotek`. Only absolute, non-empty env values count.
-* `legacy_aether_home()`: `~/.aether` (read fallback / migration source only; never written).
-* `resolve_read(rel)`: `~/.biotek/<rel>` if it exists, else `~/.aether/<rel>` if it exists, else `~/.biotek/<rel>`. All writes go to `~/.biotek`.
-* `migrate_from_aether()`: one-time, **copy-only**. Copies every regular file from `~/.aether` that is missing in `~/.biotek`; never overwrites, never deletes, skips symlinks; writes `~/.biotek/.migrated-from-aether` and is a no-op afterwards; then creates the layout. `~/.aether` is left untouched.
-* *(Earlier snapshot: "nothing calls these yet".)* Now wired: the desktop start (`lillith` with no subcommand, `run_overlay` in `apps/lillith/src/main.rs`) calls `migrate_from_aether()` once before anything else reads `~/.biotek`. It is copy-only, a no-op after the marker exists, logs what it copied, and never stops the app on error. QuantumSec (`shield.rs`, `consent.rs`, the settings tab) reads through `biotek_home()`.
+* `biotek_home()`: `$BIOTEK_HOME` → `LEGACY_HOME_ENV` (deprecated) → `~/.biotek`. Only absolute, non-empty env values count.
+* `legacy_home()`: `~/<LEGACY_DIR_NAME>` (read fallback / migration source only; never written).
+* `resolve_read(rel)`: `~/.biotek/<rel>` if it exists, else the legacy home's `<rel>` if it exists, else `~/.biotek/<rel>`. All writes go to `~/.biotek`.
+* `migrate_legacy_home()` (old name kept as a deprecated alias): one-time, **copy-only**. Copies every regular file from the legacy home that is missing in `~/.biotek`; never overwrites, never deletes, skips symlinks; writes `~/.biotek/.migrated-from-legacy-home` and is a no-op afterwards (the marker name written by earlier builds, `LEGACY_MIGRATION_MARKER`, is also honoured); then creates the layout. The legacy home is left untouched.
+* *(Earlier snapshot: "nothing calls these yet".)* Now wired: the desktop start (`lillith` with no subcommand, `run_overlay` in `apps/lillith/src/main.rs`) calls `migrate_legacy_home()` once before anything else reads `~/.biotek`. It is copy-only, a no-op after the marker exists, logs what it copied, and never stops the app on error. QuantumSec (`shield.rs`, `consent.rs`, the settings tab) reads through `biotek_home()`.
 * Model scan: `~/.biotekengine/models` is scanned as an extra directory (option (a) in §4); every older scan path is kept, in the same order.
 
-## 6. Intentionally left as "aether"
+## 6. Renamed on 2026-11-19 (previously left as provenance)
 
-| Occurrence | Why |
+| Occurrence | Now |
 |---|---|
-| `aether_animator.py`, `aether_gesture_map.py`, `aether_avatar_window.py`, `aether_tts.py`, `aether_stt.py`, … in `docs/PLAN.md`, `docs/FEATURES.md`, `crates/lillith-anim/src/{lib,gestures}.rs`, `crates/lillith-sense/src/kwin.rs`, `assets/rules.toml` (comment) | Provenance: real file names of the original Python prototype (`source/aether_*.py`, outside this repo). Renaming would break the trail. |
-| `status = "PY (aether)"` in `assets/rules.toml` | Same provenance tag (where the behaviour existed). Data, not branding. |
-| "Aether Companion" brand pass, name option "Aether" in `docs/FEATURES.md` / `docs/PLAN.md` | Historical design record. |
-| `docs/PRESERVATION_MANIFEST.md` lines 121/128 | Already describe the rename. |
-| Upstream `aether_core` / `AetherCore` / `aethermind.html` in BoiTekEngine | Upstream module names inside the Biotek Engine itself; not in this repo. |
+| Python prototype file references (`*_animator.py`, `*_gesture_map.py`, `*_avatar_window.py`, `*_tts.py`, `*_stt.py`, …) in `docs/PLAN.md`, `docs/FEATURES.md`, `crates/lillith-anim/src/{lib,gestures}.rs`, `crates/lillith-sense/src/kwin.rs`, `assets/rules.toml` | `biotek_*` (Ko: change every mention). The prototype files themselves are outside this repo. |
+| `status = "PY (…)"` provenance tags in `assets/rules.toml` | `"PY (biotek)"` (free-text tag; nothing parses it) |
+| "… Companion" brand pass and the name option in `docs/FEATURES.md` / `docs/PLAN.md` | "Biotek Companion" / "Biotek" |
+| `docs/PRESERVATION_MANIFEST.md` §12 notes | reworded without the old literal |
+| Upstream BoiTekEngine module/GUI names | described generically; not in this repo, upstream's call |
+
+Remaining literal (by design): only the `LEGACY-COMPAT` block in
+`crates/lillith-setup/src/biotek.rs`, plus the ISO guest check that asserts no
+legacy path or unit exists in the live system.
 
 ## 7. Biotek Engine integration points (for the final Lillith + QuantumSec + ISO build)
 

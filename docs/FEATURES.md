@@ -15,7 +15,7 @@ Built from every attached file (see `inventory.md`), `grok_history.md` (pass 1, 
 - **MISSING**: neither code nor art
 - **WEB**: browser demo only (Grok preview / TSX)
 
-**Source abbreviations:** README-SP = `LILLITH_README_spring_physics_edition.md`; README-DK = `README_DesKToPD_project_lillith.md`; CAP = `CAPABILITIES_aether_lillith.md`; INV = `aether_companion_full_inventory_notes.md`; GH#n = conversation n in `grok_history.md`; v01–v12, mod_*, aether_*, lillith_* = files in `source/`.
+**Source abbreviations:** README-SP = `LILLITH_README_spring_physics_edition.md`; README-DK = `README_DesKToPD_project_lillith.md`; CAP = `CAPABILITIES_biotek_lillith.md`; INV = `biotek_companion_full_inventory_notes.md`; GH#n = conversation n in `grok_history.md`; v01–v12, mod_*, biotek_*, lillith_* = files in `source/`.
 
 **Repo column:** status in `github.com/kokannadian-killa/Lillith-Desktop-Avatar` (private, branch `main`), checked 2026-10-19 at 04:31 MDT.
 - The repo holds one commit, `afb24cc` "Initial commit", made 04:31 MDT, about when it was shared. Its only file is a 2-line `README.md`: "Interactive desktop avatar and system state and action moniter".
@@ -30,7 +30,7 @@ Persona policy: Lillith is a fully explicit, dominant adult succubus; explicit c
 
 | Feature | Sources | Status | Repo |
 |---|---|---|---|
-| Transparent, frameless, always-on-top avatar window | v01–v12, aether_avatar_window, README-SP, GH#1/#11/#12 | PY. Tk works on X11. pygame is not truly transparent. Wayland is unsolved | — |
+| Transparent, frameless, always-on-top avatar window | v01–v12, biotek_avatar_window, README-SP, GH#1/#11/#12 | PY. Tk works on X11. pygame is not truly transparent. Wayland is unsolved | — |
 | Base idle pose (sitting / rock-on) | pose_map (sitting.png), CreationImagesNeeded, character_fullbody_reference | ART + PY | — |
 | Micro "jiggle": random rotate/shift/scale per frame | v01–v12 | PY (works, looks cheap) | — |
 | Multi-body spring-damper physics (chest, pigtails, root, angle, scale) with tunable stiffness/damping, sub-stepping, velocity clamp | README-SP | PY-missing | — |
@@ -40,20 +40,20 @@ Persona policy: Lillith is a fully explicit, dominant adult succubus; explicit c
 | Idle transitions every 8–12 s: hip sway, curious lean-forward, shoulder roll, hips shift, soft reset | phys_idle_transitions, prompt_refined_idle_transitions, physics_ref_A–D | ART (keyframe refs) + SPEC | — |
 | Pose cycling of idle poses every 14–18 s | v01+, config_A/B | PY (works) | — |
 | Random idle reactions every 8–28 s (tail wag, blink, glitch, hacking) | v01+, mod_reactions | PY (works) | — |
-| Walk cycle / patrol along the taskbar, sprite flip for return | aether_avatar_window, INV (sprite_sheet walk_left/right), GH#1/#5, sheets | PY (procedural) + ART (walk sheets, left-run 4×3) | — |
+| Walk cycle / patrol along the taskbar, sprite flip for return | biotek_avatar_window, INV (sprite_sheet walk_left/right), GH#1/#5, sheets | PY (procedural) + ART (walk sheets, left-run 4×3) | — |
 | Running | pose 24, left-run sheet, alt sheet row 1 | ART | — |
 | Spell/orb/beam/aura cast animations | 3 alpha sheets | ART only (no feature wired) | — |
 | Sword slash, jump/flip/spin, lounging | alt-style sheet | ART (different style) | — |
 | Multi-frame sequences engine (knife_ready → knife_swing → knife; volume frames) | README-SP | PY-missing | — |
-| Procedural gesture library: float, bounce, wave, stab, point_right, think, tada, dance, salute, nod, shrug, facepalm, gif playback | aether_animator | PY (works with any single image) | — |
+| Procedural gesture library: float, bounce, wave, stab, point_right, think, tada, dance, salute, nod, shrug, facepalm, gif playback | biotek_animator | PY (works with any single image) | — |
 | Knife-tap loop on window edge with sparks + fading crack | phys_knife_tap, anim_core_knife_tap, pose 28, physics_ref_D | ART + SPEC | — |
 | Tail physics (S-curve figure-8, heart-tip glow/flick) | phys_tail, phys_tail_heart | SPEC | — |
 | Horn nebula glow, tattoo glow + particles, pigtail bounce, facial micro-expressions (blink 4–6 s, wink, tongue peek) | phys_* | SPEC (I2V prompts) | — |
 | Particle system (cyan, magenta, purple, gold, red, soft) | README-SP | PY-missing | — |
-| Speech bubbles (mood-aware lines) | aether_avatar_window (SpeechBubble), README-SP, LillithStage | PY | — |
-| Drop shadow, default avatar generation | aether_image_loader | PY | — |
-| Upload your own avatar photo → background removal / segmentation | aether_onboarding, aether_body_segmenter (rembg) | PY | — |
-| "Learned" gestures (feedback scoring, mutation, blending) | aether_movement_learner | PY (optional) | — |
+| Speech bubbles (mood-aware lines) | biotek_avatar_window (SpeechBubble), README-SP, LillithStage | PY | — |
+| Drop shadow, default avatar generation | biotek_image_loader | PY | — |
+| Upload your own avatar photo → background removal / segmentation | biotek_onboarding, biotek_body_segmenter (rembg) | PY | — |
+| "Learned" gestures (feedback scoring, mutation, blending) | biotek_movement_learner | PY (optional) | — |
 | Video-reel playback (rock/stage/city reels) | LillithStage.tsx, motion-manifest, 80 frames | WEB + ART (frames unordered) | — |
 | Mood system: Playful, Happy, Mischievous, Alert, Sleepy (+ warm/excited in web) | README-SP, LillithStage | PY-missing / WEB | — |
 | Mischief meter (grows when ignored → playful interruptions) | README-SP | PY-missing | — |
@@ -79,7 +79,7 @@ Persona policy: Lillith is a fully explicit, dominant adult succubus; explicit c
 
 | Feature | Sources | Status | Repo |
 |---|---|---|---|
-| Wander / patrol (walk the desk or taskbar) | GH#1, aether_avatar_window, INV | PY (X11) / WEB | — |
+| Wander / patrol (walk the desk or taskbar) | GH#1, biotek_avatar_window, INV | PY (X11) / WEB | — |
 | Follow pointer | GH#1 | WEB | — |
 | Stay / park | GH#1 | WEB | — |
 | Perch on window title bars; drop-to-sit on title bar after drag; snap-to-window | GH#1, INV, CAP (avatar_window) | PY-missing (needs window geometry) | — |
@@ -132,8 +132,8 @@ Each row gives the event, the pose (clean name from pose_map / file in `assets/p
 | Idle → sit → sleep; return → peek / wake | sitting (42), sleep (34), peeking (45) | ext-idle-notify-v1 (Wayland) / MIT-SCREEN-SAVER (X11) → `user.activity` (keeps her awake), `user.returned` after ≥ 120 s away; drowsy/asleep stay the brain's own timers | PY-missing | IMPL (M4) — needs Plasma 6 smoke test |
 | Loading / busy app start | loading (16), running (24) | process spawn (sysinfo diff) | ART | — |
 | Waiting for input / awaiting approval | waiting (11) | own confirmation dialogs | ART + SPEC (README-DK) | — |
-| Error (app crash / journal error / LLM error) | error (43) | journald, own errors | PY (aether gesture_map on_error) | — |
-| LLM thinking / done | think → tada; waiting | own | PY (aether) | — |
+| Error (app crash / journal error / LLM error) | error (43) | journald, own errors | PY (biotek gesture_map on_error) | — |
+| LLM thinking / done | think → tada; waiting | own | PY (biotek) | — |
 | Help request | help (46) | own | PY | — |
 | Diagnostics / tools / settings / task manager | diagnostics (37), tools (50), 14/41/47 unresolved | own panels | ART | — |
 | Dual-tail ready | dual_tail (04, guess) | key T | ART | — |
@@ -159,8 +159,8 @@ Each row gives the event, the pose (clean name from pose_map / file in `assets/p
 | OpenVINO/optimum-intel inference on Intel HD 620 (PyQt6 frameless window, temp 0.7, max 150 tok, "SCAN DESKTOP" via `spectacle -f -b -n -o`) | lillith_os_v2.py (P2-§2) | PY (needs verify) | — |
 | Tool approval gating (safe/risky/danger) + waiting pose | README-DK, CAP | PY-missing | — |
 | Vision: screenshot + vision LLM (moondream/llava) "What do you see?" | lillith_os_v2 (Spectacle), CAP screenshot_analyzer, GH#3 | PY (capture only) | — |
-| TTS: Piper → espeak-ng → festival → spd-say → silent | lillith_tts_engine, aether_tts | **PY (complete)** | — |
-| STT push-to-talk: arecord/ffmpeg + whisper / whisper.cpp | lillith_voice_input, aether_stt | **PY (complete)** | — |
+| TTS: Piper → espeak-ng → festival → spd-say → silent | lillith_tts_engine, biotek_tts | **PY (complete)** | — |
+| STT push-to-talk: arecord/ffmpeg + whisper / whisper.cpp | lillith_voice_input, biotek_stt | **PY (complete)** | — |
 | Sound effects (19 cues) via pygame/paplay, mute | README_SOUNDS, README-SP | PY-missing. No sound files attached | — |
 | Session logs JSONL + transcript | README-DK | PY-missing | — |
 
@@ -169,13 +169,13 @@ Each row gives the event, the pose (clean name from pose_map / file in `assets/p
 | Feature | Sources | Status | Repo |
 |---|---|---|---|
 | System tray: Show/Hide, Random Reaction, Hacking Mode, Mute, Talk to Lillith, Status, Voice Listen, Quit | mod_tray, v04+, README-SP | PY (pystray) | — |
-| Right-click context menu: upload image, settings, hide, toggle topmost | aether_avatar_window, GH#4 (pose menu) | PY | — |
-| Settings panel (avatar image, patrol, HID reactions, pose map) | aether_avatar_settings | PY (CTk) | — |
-| First-run onboarding: avatar upload / model scanner / Modelfile editor | aether_onboarding, aether_main_v1/v2 | PY (partial) | — |
+| Right-click context menu: upload image, settings, hide, toggle topmost | biotek_avatar_window, GH#4 (pose menu) | PY | — |
+| Settings panel (avatar image, patrol, HID reactions, pose map) | biotek_avatar_settings | PY (CTk) | — |
+| First-run onboarding: avatar upload / model scanner / Modelfile editor | biotek_onboarding, biotek_main_v1/v2 | PY (partial) | — |
 | Side panel with commands (help, tidy desk, focus 1, scan), Poses tab, pulse meters | GH#4 | WEB | — |
 | Fish-style terminal (`lillith@garuda`): event/pose/speed/sway/breath commands | GH#5 | WEB | — |
 | Stage/reel player with sway/bounce sliders + event buttons with lines and moods | LillithStage.tsx | WEB | — |
-| Knife-tab main window (10 tabs), brain terminal thought stream, floating orb, toolbar | README-DK, aether_main | PY-missing (out of core scope) | — |
+| Knife-tab main window (10 tabs), brain terminal thought stream, floating orb, toolbar | README-DK, biotek_main | PY-missing (out of core scope) | — |
 | Global hotkeys Ctrl+Alt+A/O/V | README-DK | PY-missing (pynput, poor on Wayland) | — |
 | Plans shown first, Approve button | GH#3 | WEB/SPEC | — |
 | config.ini / config.json with all tunables | README-SP, config_A/B, mod_config | PY | — |
@@ -187,7 +187,7 @@ Each row gives the event, the pose (clean name from pose_map / file in `assets/p
 | Target: Garuda (Arch), KDE Plasma 6 **Wayland**, HP Spectre x360 i5-7200U / Intel HD 620, fish shell | lillith_os_v2, GH#5/#12, README-SP | info | — |
 | Always-on-top on Wayland (layer-shell overlay; KWin "Keep above" rule fallback) | GH#12, README-SP troubleshooting | SPEC | M1: `zwlr_layer_shell_v1` Overlay layer + input-region click-through (compiles; needs on-machine smoke test); X11/XWayland fallback verified |
 | X11 always-on-top via wmctrl | v12, GH#11 | PY (X11 only) | — |
-| Window list/events via wmctrl/xdotool | aether_event_watcher | PY (X11 only) | — |
+| Window list/events via wmctrl/xdotool | biotek_event_watcher | PY (X11 only) | — |
 | Autostart (.desktop in ~/.config/autostart), install via pacman | install_arch_autostart, README-SP | PY | — |
 | Windows build (PyInstaller --onefile, startup folder) | pyinstaller_windows_notes, README-DK | SPEC | — |
 | Windows installer `Lillith-The-Master-Setup.iss` (Inno Setup: AppName "Lillith The Master" v1.0, copies all to {app}, launches tools\launch.bat) | P2-1c | SPEC (.iss not retrieved) | — |
@@ -211,5 +211,5 @@ Each row gives the event, the pose (clean name from pose_map / file in `assets/p
 | Chroma-key #00ff00 regeneration prompts | GH#9 | SPEC | — |
 | 10 I2V motion ideas (peek tilt, tail-drag, screen clean, sit-and-swing, help-to-loading, key unlock, knife crack, rock-on sway, sleep yawn, running alert) | P2-§2 | SPEC | — |
 | I2V prompt library (knife/tail/horn/tattoo/breath/face/idle) | phys_*, prompt_* | SPEC | — |
-| Demon OS palette ink #120810, rose #e23d8a, ice #5fd0e6, paper #f8eef4; "Lillith 2029" theme #120014 / C026D3 (P2-B PASS: og.jpg 1200×630); "Lilith" void #07060b/ember #e23d8c (P2-A, card FAIL); Aether charcoal #12110f/ember #c46a45 (P2-C PASS); Garuda violet/cyan/dragon red | GH#8, route_root.tsx, README-DK, P2-A/B/C | SPEC | — |
-| Name: Lillith (also "Lilith", "Nyx", "Sable", "Aether", "Cyber-Demon") | all | decide (open question) | — |
+| Demon OS palette ink #120810, rose #e23d8a, ice #5fd0e6, paper #f8eef4; "Lillith 2029" theme #120014 / C026D3 (P2-B PASS: og.jpg 1200×630); "Lilith" void #07060b/ember #e23d8c (P2-A, card FAIL); Biotek charcoal #12110f/ember #c46a45 (P2-C PASS); Garuda violet/cyan/dragon red | GH#8, route_root.tsx, README-DK, P2-A/B/C | SPEC | — |
+| Name: Lillith (also "Lilith", "Nyx", "Sable", "Biotek", "Cyber-Demon") | all | decide (open question) | — |
