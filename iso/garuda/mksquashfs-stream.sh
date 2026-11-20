@@ -12,6 +12,10 @@ SRC="${1:-}"; DEST="${2:-}"
 shift 2
 opts=()
 for a in "$@"; do [[ "$a" == -noappend ]] || opts+=("$a"); done
+# Cap sqfstar's RAM: on a shared 16 GB box the default (1/4 of RAM for the
+# fragment/block caches + one zstd context per CPU) was OOM-killed on
+# 2026-11-19 with ~3 GB available. Override with DEMONOS_SQFS_MEM / _PROCS.
+opts+=(-mem "${DEMONOS_SQFS_MEM:-512M}" -processors "${DEMONOS_SQFS_PROCS:-2}")
 before=$(find "$SRC" -mindepth 1 | wc -l)
 echo "[sqfs-stream] $SRC -> $DEST: $before entries, file caps $(getcap -r "$SRC" 2>/dev/null | wc -l); options: ${opts[*]}"
 rm -f "$DEST"
