@@ -2,6 +2,24 @@
 
 Branch `quantumsec/integration` holds the finished work: Phases 0–3 plus the DemonOS PhantomCore ISO tooling (Phase 4, PR #13), synced with current `main` (`07a7e9f`: Dream learning and the Bots tab) in PR #17. Everything is **additive** on top of `main`: nothing that existed was removed, hidden or renamed. `main` is untouched; merging it is Ko's call (see the integration → main PR).
 
+> **Where this work is delivered (verified 2026-11-15, git ancestry, not memory).**
+> QuantumSec phases 1-3 (and the Phase 4 ISO tooling) live on the `quantumsec/*`
+> branches of Lillith-Desktop-Avatar and in **this distribution repo's `main`**. They are
+> **not** on Lillith-Desktop-Avatar `main`. In this handover, "`main`" means the desktop
+> repo's `main` as of 2026-10-30 (`07a7e9f`), which is what "untouched" refers to.
+>
+> | Ref | Commit | Contains QuantumSec phases 1-3? | Evidence |
+> |---|---|---|---|
+> | `quantumsec/phase1`, `phase2`, `phase3` (desktop repo) | `4835ab3`, `23d8a6b`, `b9b409f` | yes (each phase) | merged into `quantumsec/integration` by desktop PRs #10, #11, #12 (2026-10-30, 04:07 / 05:12 / 05:42 MDT) |
+> | `quantumsec/integration` (desktop repo) | `1d2ecba` (PR #18 merge) | yes | all three phase tips are ancestors (`git merge-base --is-ancestor`) |
+> | **This repo's `main`** (Demon-AI-QuantumSec-BioTek-Engine) | `7d4472b` | **yes** | `1d2ecba` is an ancestor; `main` = `1d2ecba` + 2 README commits (`316b485`, `7d4472b`); `crates/lillith-quantumsec` is present |
+> | Lillith-Desktop-Avatar `main` | `1fcac41` | **no** | none of the `quantumsec/*` tips is an ancestor; `crates/lillith-quantumsec` is absent; PR #16 (`quantumsec/integration` → `main`) is still **open, not merged** (Ko's call) |
+>
+> The two `main`s have diverged since their merge base `07a7e9f`: desktop `main` has
+> 162 commits that are not in this repo, and this repo has 41 that are not on desktop
+> `main` (checked 2026-11-15). So this snapshot does not include later desktop work, and
+> desktop `main` does not include QuantumSec.
+
 Preservation is audited against two baselines:
 * the original baseline, `main` @ `ec00366` (see [`docs/PRESERVATION_MANIFEST.md`](PRESERVATION_MANIFEST.md));
 * current `main` @ `07a7e9f`, which adds Dream learning and the Bots tab. It is merged into integration (PR #17).
