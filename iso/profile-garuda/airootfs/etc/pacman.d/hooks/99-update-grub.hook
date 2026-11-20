@@ -1,0 +1,17 @@
+# remove from airootfs!
+# Build-time mask of garuda-hooks' 99-update-grub.hook (same file name in
+# /etc/pacman.d/hooks overrides /usr/share/libalpm/hooks). While mkarchiso
+# installs packages it would run grub-mkconfig + os-prober inside the build
+# chroot and probe the build host's disks. The live ISO boots from archiso's own
+# GRUB/syslinux configs, so nothing is lost; zzzz99-remove-custom-hooks deletes
+# this mask at the end of the build, so the live system keeps Garuda's real hook.
+[Trigger]
+Operation = Install
+Operation = Remove
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+
+[Action]
+Description = (build) skipping update-grub inside the ISO build chroot
+When = PostTransaction
+Exec = /usr/bin/true

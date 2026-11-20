@@ -2,6 +2,24 @@
 
 Branch `quantumsec/integration` holds the finished work: Phases 0–3 plus the DemonOS PhantomCore ISO tooling (Phase 4, PR #13), synced with current `main` (`07a7e9f`: Dream learning and the Bots tab) in PR #17. Everything is **additive** on top of `main`: nothing that existed was removed, hidden or renamed. `main` is untouched; merging it is Ko's call (see the integration → main PR).
 
+> **Where this work is delivered (verified 2026-11-15, git ancestry, not memory).**
+> QuantumSec phases 1-3 (and the Phase 4 ISO tooling) live on the `quantumsec/*`
+> branches of Lillith-Desktop-Avatar and in **this distribution repo's `main`**. They are
+> **not** on Lillith-Desktop-Avatar `main`. In this handover, "`main`" means the desktop
+> repo's `main` as of 2026-10-30 (`07a7e9f`), which is what "untouched" refers to.
+>
+> | Ref | Commit | Contains QuantumSec phases 1-3? | Evidence |
+> |---|---|---|---|
+> | `quantumsec/phase1`, `phase2`, `phase3` (desktop repo) | `4835ab3`, `23d8a6b`, `b9b409f` | yes (each phase) | merged into `quantumsec/integration` by desktop PRs #10, #11, #12 (2026-10-30, 04:07 / 05:12 / 05:42 MDT) |
+> | `quantumsec/integration` (desktop repo) | `1d2ecba` (PR #18 merge) | yes | all three phase tips are ancestors (`git merge-base --is-ancestor`) |
+> | **This repo's `main`** (Demon-AI-QuantumSec-BioTek-Engine) | `7d4472b` | **yes** | `1d2ecba` is an ancestor; `main` = `1d2ecba` + 2 README commits (`316b485`, `7d4472b`); `crates/lillith-quantumsec` is present |
+> | Lillith-Desktop-Avatar `main` | `1fcac41` | **no** | none of the `quantumsec/*` tips is an ancestor; `crates/lillith-quantumsec` is absent; PR #16 (`quantumsec/integration` → `main`) is still **open, not merged** (Ko's call) |
+>
+> The two `main`s have diverged since their merge base `07a7e9f`: desktop `main` has
+> 162 commits that are not in this repo, and this repo has 41 that are not on desktop
+> `main` (checked 2026-11-15). So this snapshot does not include later desktop work, and
+> desktop `main` does not include QuantumSec.
+
 Preservation is audited against two baselines:
 * the original baseline, `main` @ `ec00366` (see [`docs/PRESERVATION_MANIFEST.md`](PRESERVATION_MANIFEST.md));
 * current `main` @ `07a7e9f`, which adds Dream learning and the Bots tab. It is merged into integration (PR #17).
@@ -49,7 +67,7 @@ The 31 deleted lines (`main...integration`, without Cargo.lock) are all rewordin
 * test counts updated for the new menu items and tab;
 * help text and doc comments extended;
 * wizard "step N of 5" changed to 6;
-* the Aether → Biotek relabels listed in `docs/BIOTEK_TERMINOLOGY_MAP.md`;
+* the pre-Biotek → Biotek relabels listed in `docs/BIOTEK_TERMINOLOGY_MAP.md`;
 * the tray title `Lillith` → `Lillith · DemonOS`;
 * the About title `Lillith` kept, with an info rune beside it;
 * the consent-card glyphs `⛧ ✕ ✓` changed to `⚠` / plain text, because those glyphs rendered as tofu boxes on the DemonOS font. The buttons and their behaviour are unchanged.
@@ -368,11 +386,37 @@ The paths used on the build box were:
   * local model (qwen2.5-0.5b, llama-server) answers on `127.0.0.1:8080` and is bound to loopback only.
 * In the first UEFI run, 16 of 17 passed. Only the Bots-tab launch failed, because of the harness's wrong Wayland socket name.
 
+## 6a. Garuda boot proof (2026-10-30)
+
+The Garuda Dr460nized-based ISO (`iso/profile-garuda`, details in `iso/garuda/README.md`):
+
+* **ISO:** `demonos-phantomcore-garuda-2026.10.31-x86_64.iso`
+  * 5,753,348,096 bytes (5.4 GiB)
+  * sha256 `a4ad54b38899c40aed58e37d2755a6dc263990ef9a42815d71de14f7e962da05`
+  * built 19:24 MDT from `garuda/dragonized-rebase` @ `6e60a19`; on the build box at `/workspace/qsec/iso-build/out/`
+  * 1313 packages from `[garuda]`, `[chaotic-aur]`, `[core]`, `[extra]`, `[multilib]` and `[demonos-local]` (lillith, lillith-llama-bin); kernel `linux-garuda`
+* **Boot tests:** QEMU **TCG** (never KVM), 4 GiB file-backed RAM, 4 vCPU, virtio-gpu, `EXPECT_GARUDA=1`, in `/workspace/qsec/iso-build/boot-test/garuda3-20261030-192727/{bios,uefi}/`:
+  * **BIOS (SeaBIOS): 31/31 PASS**
+  * **UEFI (OVMF): 31/31 PASS**
+  * the 31 checks are the 17 DemonOS checks above plus the Garuda-base and branding checks: Garuda packages installed, `[garuda]` + `[chaotic-aur]` configured, running kernel `linux-garuda`, os-release `NAME="DemonOS PhantomCore"` / `ID=demonos` / `ID_LIKE="garuda arch"`, lsb-release `DISTRIB_ID=DemonOS`, SDDM theme `demonos`, Plymouth `demonos`, Plasma LnF `org.demonos.phantomcore` + DemonOS colours, DemonOS wallpaper, Dr460nized panel + dock with the DemonOS start icon and Lillith pinned, fastfetch DemonOS logo + OS line, GRUB defaults, file capabilities, SDDM DemonOS greeter render.
+
+| Stage | BIOS | UEFI |
+|---|---|---|
+| Boot menu (syslinux / GRUB, DemonOS theme) | `bios/shot-0001-6s.png` | `uefi/shot-0002-12s.png` |
+| Plymouth "AWAKENING THE CORE" | `bios/shot-0006-36s.png` | `uefi/shot-0006-36s.png` |
+| SDDM DemonOS greeter (test mode; autologin skips it at boot) | `bios/shot-sddm-demonos-theme.png` | `uefi/shot-sddm-demonos-theme.png` |
+| Desktop with Lillith, QuantumSec awakening dialog, Dr460nized top panel | `bios/shot-desktop-lillith.png` | `uefi/shot-desktop-lillith.png` |
+| Bots tab | `bios/shot-bots-tab.png` | `uefi/shot-bots-tab.png` |
+| Desktop still live | `bios/shot-0044-1020s.png` = SCREEN-LIVE | `uefi/shot-0044-1020s.png` = SCREEN-LIVE |
+
+* Earlier Garuda builds are listed in `iso/garuda/README.md` (build 1: 27/30 UEFI, 28/31 BIOS, per-user Plasma config left Garuda's; build 2: disk full during pacstrap). Both were fixed, and none of the checks was relaxed.
+
 ## 7. Known limitations
 
 * **STATUS CRITICAL on VMs.** Under QEMU TCG the CPU is pinned at about 100%, so Resource Load ≥ 90% raises an Alert. This is expected and the thresholds were not changed (§2).
 * **"2 missing" under File Integrity** on a fresh live user. Those are watched config files that don't exist yet. It is a notice only.
 * **No KVM in the tests** (it crashes this host). TCG boots take about 2.5 min to reach the desktop and about 16 min for a full test run.
 * **The ISO is not signed** (no Secure Boot shim). It is not uploaded anywhere and lives only on the build box.
+  * Signing status and plan (TODOs for Ko: release signature, Secure Boot yes/no, publishing channel; no keys generated): [`docs/ISO_SIGNING.md`](ISO_SIGNING.md). Until then release notes say "unsigned, local-only ISO; Secure Boot off".
 * **Red team is local simulation only.** Nothing in the ISO attacks or scans other hosts.
 * **CI Windows job** takes about 18 min. The fmt/clippy fixes needed for green CI went in via PR #14 (formatting only).

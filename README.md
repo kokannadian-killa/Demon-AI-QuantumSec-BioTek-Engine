@@ -10,8 +10,27 @@ What it contains:
 - **The original Lillith desktop avatar**, with nothing removed, plus Dream learning and the Bots tab.
 - **QuantumSec**: `crates/lillith-quantumsec`, the blood-seal consent dialog, and the systemd units in `linux/systemd/`.
 - **The Biotek rename**: the data home is `~/.biotek`; see `docs/BIOTEK_TERMINOLOGY_MAP.md`.
+- **Biotek Engine status**: despite the repository name, the upstream Biotek Engine
+  (`biotekengine`, BoiTekEngine repo) is **not** included, in git or in the ISO. No
+  engine artifact, licence or runtime contract is pinned yet; that is Ko's call. The only
+  pinned local runtime is llama.cpp `b11829` (`184f653`, MIT) on `127.0.0.1:8080`. See
+  `docs/BIOTEK_TERMINOLOGY_MAP.md` §0 and §8a (loopback ports reserved for the engine).
 - **The DemonOS PhantomCore ISO profile**: `iso/`, with `iso/build-iso.sh` and `iso/test-boot.sh`.
 - **The handover**: `docs/HANDOVER.md` (launch, test and rebuild commands, boot proof, limitations).
+
+Where QuantumSec phases 1-3 are delivered (verified 2026-11-15 with `git merge-base --is-ancestor`):
+
+| Ref | Commit | Contains QuantumSec phases 1-3? | Evidence |
+|---|---|---|---|
+| `quantumsec/phase1`, `phase2`, `phase3` (desktop repo) | `4835ab3`, `23d8a6b`, `b9b409f` | yes (each phase) | merged into `quantumsec/integration` by desktop PRs #10, #11, #12 (2026-10-30, 04:07 / 05:12 / 05:42 MDT) |
+| `quantumsec/integration` (desktop repo) | `1d2ecba` (PR #18 merge) | yes | all three phase tips are ancestors (`git merge-base --is-ancestor`) |
+| **This repo's `main`** (Demon-AI-QuantumSec-BioTek-Engine) | `7d4472b` | **yes** | `1d2ecba` is an ancestor; `main` = `1d2ecba` + 2 README commits (`316b485`, `7d4472b`); `crates/lillith-quantumsec` is present |
+| Lillith-Desktop-Avatar `main` | `1fcac41` | **no** | none of the `quantumsec/*` tips is an ancestor; `crates/lillith-quantumsec` is absent; PR #16 (`quantumsec/integration` → `main`) is still **open, not merged** (Ko's call) |
+
+The two `main`s have diverged since their merge base `07a7e9f`: desktop `main` has
+162 commits that are not in this repo, and this repo has 41 that are not on desktop
+`main` (checked 2026-11-15). So this snapshot does not include later desktop work, and
+desktop `main` does not include QuantumSec.
 
 Notes:
 
@@ -21,7 +40,7 @@ Notes:
 
 Roadmap:
 
-- Next: rebase the ISO on Garuda Linux Dragonized (KDE) with full DemonOS PhantomCore rebranding (in progress). The current ISO profile is based on Arch Linux archiso (releng) with KDE Plasma; it is not Garuda-based yet.
+- Garuda Linux Dr460nized (KDE) rebase with full DemonOS PhantomCore rebranding: verified in the `garuda/dragonized-rebase` pull request (`iso/profile-garuda`; BIOS and UEFI QEMU boot tests 31/31 guest checks each; see `iso/garuda/README.md`). The Arch Linux archiso (releng) profile `iso/profile` is kept alongside it.
 
 ---
 
@@ -186,11 +205,18 @@ Authoritative milestone list and acceptance criteria: [`docs/PLAN.md` §5](docs/
 | ✅ | **M2** — Animation engine | Clip player, springs, breathing, blink, idle transitions, walk cycle with flip, every clip previewable (`lillith preview`, panel Poses tab). *Physics now driven by the tuned `physics.toml`.* |
 | ✅ | **M3** — Interaction & state machine | Left/double/right/middle click, hover → peek, drag pose, random idle, pose cycle, README-SP keys, secret sequence, moods, mischief, sleep/wake, Wander/Stay; fake-clock unit tests |
 | 🚧 | **M4** — System monitor v1 | Real detection for CPU, RAM, battery, net lost/restored, Wi-Fi, VPN, volume, brightness, USB, notifications, trash, screenshot, idle/return; cooldown + hysteresis |
-| 🗓️ | **M5** — KWin bridge | `kpackagetool6` script; window open/close/minimize reactions; perching on the focused title bar; Follow mode and proximity wake |
-| 🗓️ | **M6** — Tray, panels, config | ksni tray menu, live egui settings for `config.toml`, autostart `.desktop` + PKGBUILD |
-| 🗓️ | **M7** — Memory + LLM chat | rusqlite memory, chat bar (Y/Enter) streaming from Ollama / llama-server, offline personality lines, read-only tools with approval |
-| 🗓️ | **M8** — Voice | Spoken replies (Piper, else espeak-ng), push-to-talk → whisper → chat |
-| 🗓️ | **M9** — Proactive life & polish | Proactive comments, greeting styles, work-session nudges, SFX, particles, optional "What do you see?" vision |
+| 🚧 | **M5** — KWin bridge | `kpackagetool6` script; window open/close/minimize reactions; perching on the focused title bar; Follow mode and proximity wake *Partial: `kwin/lillith-bridge` script, `window.*` events and perching code are in the tree; `TODO(M5)` remains in `lillith-sense/src/kwin.rs` (cursor / Follow, `focus.long_work`, start-menu detect).* |
+| 🔎 | **M6** — Tray, panels, config | ksni tray menu, live egui settings for `config.toml`, autostart `.desktop` + PKGBUILD *Code present (`lillith-tray`, `lillith-settings-gui` with the setup wizard, `linux/PKGBUILD`, `linux/lillith.desktop`); acceptance not re-run for this table.* |
+| 🔎 | **M7** — Memory + LLM chat | rusqlite memory, chat bar (Y/Enter) streaming from Ollama / llama-server, offline personality lines, read-only tools with approval *Code present (`lillith-memory` on rusqlite, chat bar/bubble in `apps/lillith/src/chat.rs`, approval card); acceptance not re-run for this table.* |
+| 🔎 | **M8** — Voice | Spoken replies (Piper, else espeak-ng), push-to-talk → whisper → chat *Code present (`lillith-voice` TTS/STT, voice sidecar); acceptance not re-run for this table.* |
+| 🚧 | **M9** — Proactive life & polish | Proactive comments, greeting styles, work-session nudges, SFX, particles, optional "What do you see?" vision *Partial: particles, SFX, journal reader and proactive lines exist; the full list (calendar, print, firewall, vision) is not verified.* |
+| 🗓️ | **M10** — Extras & integrations | Each `docs/PLAN.md` §5.1 M10 item as its own cargo feature + config switch. Open. |
+| ✅ | **QuantumSec phases 1-3** | Shield, teams (red = local simulation only), consent / blood seal, wizard step, units. On this repo's `main` and the `quantumsec/*` branches; **not** on Lillith-Desktop-Avatar `main` (its PR #16 is open). |
+| ✅ | **DemonOS PhantomCore ISO (archiso)** | Built and boot-tested under QEMU TCG only (17/17 guest checks, `docs/HANDOVER.md` §6). **Unsigned, Secure Boot off** (`docs/ISO_SIGNING.md`); not published. |
+| 🚧 | **Garuda Dragonized rebase** | PR #1 (`garuda/dragonized-rebase` @ `3f9833c`), open, not merged; merging is Ko's call. |
+| 🗓️ | **Biotek Engine integration** | Not started in this repo: no engine artifact, licence or runtime contract pinned (`docs/BIOTEK_TERMINOLOGY_MAP.md`). The ISO does not contain the engine. |
+
+Legend (refreshed 2026-11-15, America/Edmonton): ✅ met with recorded evidence · 🚧 partial · 🔎 code present, acceptance not re-verified · 🗓️ open.
 
 ## Quick start
 

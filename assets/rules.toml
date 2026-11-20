@@ -9,7 +9,7 @@
 #   event       event name emitted on the bus (lillith-sense or the injector)
 #   pose        clean pose name (assets/source/poses/NN_<pose>.*)
 #   then        optional follow-up pose once `pose` finishes
-#   gesture     procedural gesture (aether_animator names), optional
+#   gesture     procedural gesture (biotek_animator names), optional
 #   line        speech-bubble line, optional ("{summary}" = notification text)
 #   mood        Playful | Happy | Mischievous | Alert | Sleepy, optional
 #   sfx         README_SOUNDS cue name, optional
@@ -502,7 +502,7 @@ gesture = "think"
 line = "Hmm…"
 priority = 70
 source = "lillith-mind"
-status = "PY (aether)"
+status = "PY (biotek)"
 
 [[rule]]
 event = "llm.done"
@@ -510,7 +510,7 @@ pose = "sitting"
 gesture = "tada"
 priority = 70
 source = "lillith-mind"
-status = "PY (aether)"
+status = "PY (biotek)"
 
 [[rule]]
 event = "approval.needed"

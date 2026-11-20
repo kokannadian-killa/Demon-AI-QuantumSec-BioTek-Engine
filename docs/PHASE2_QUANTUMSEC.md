@@ -2,6 +2,12 @@
 
 Additive on `quantumsec/integration` after Phase 1 (PR #10).
 
+> **Delivery status (verified 2026-11-15):** `quantumsec/phase2` @ `23d8a6b` was merged into
+> `quantumsec/integration` (Lillith-Desktop-Avatar PR #11) and is in this distribution
+> repo's `main` (`7d4472b`). It is **not** on Lillith-Desktop-Avatar `main` (`1fcac41`);
+> the integration → `main` PR #16 there is still open. "Delivered" below means delivered on
+> those branches, not on desktop `main`. See `docs/HANDOVER.md` (top) for the evidence.
+
 ## Delivered
 
 | Area | Where | Notes |

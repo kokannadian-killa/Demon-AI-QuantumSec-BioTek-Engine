@@ -1,0 +1,7 @@
+[Daemon]
+Autolock=false
+LockOnResume=false
+
+[Greeter][Wallpaper][org.kde.image][General]
+Image=file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png
+PreviewImage=file:///usr/share/wallpapers/DemonOS/contents/images/1920x1080.png

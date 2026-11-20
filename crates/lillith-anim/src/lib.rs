@@ -8,7 +8,7 @@
 //! - [`render`]: CPU compositing of an animator frame (spring transform, flip).
 //! - [`preview`]: headless clip preview (contact sheets / frame dumps).
 //! - [`player`]: clip player (fixed fps or per-frame durations, loop/once, feet anchor).
-//! - [`gestures`]: procedural gestures ported from `aether_animator.py`
+//! - [`gestures`]: procedural gestures ported from `biotek_animator.py`
 //!   (easing/tweens become spring targets and impulses).
 //! - [`talk`]: token-driven lip-flap for the `talk_loop` clip (chat replies).
 //! - [`lipsync`]: audio-driven lip-sync from the voice daemon's envelope/visemes.

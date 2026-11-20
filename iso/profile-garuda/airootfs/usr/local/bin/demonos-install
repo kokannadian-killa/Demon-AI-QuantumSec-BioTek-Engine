@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Start the DemonOS installer (Calamares) from the live session. Calamares
+# needs root; the live user has passwordless sudo on the live medium only.
+# Nothing is written to any disk until "Install" is confirmed in Calamares.
+exec sudo -E calamares "$@"

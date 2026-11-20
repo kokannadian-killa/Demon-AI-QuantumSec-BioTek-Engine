@@ -1413,6 +1413,18 @@ async fn run_quantumsec(interval_s: u64, once: bool) -> Result<()> {
 async fn run_overlay(cli: &Cli, rules: usize) -> Result<()> {
     let backend = Backend::detect_env(cli.backend);
     let (cfg, config_path) = load_config(cli);
+    // Biotek data home: one-time, copy-only legacy-home -> `~/.biotek`
+    // migration, then the layout (docs/BIOTEK_TERMINOLOGY_MAP.md §5).
+    // A no-op after the first run; never deletes; never fatal.
+    match lillith_setup::biotek::migrate_legacy_home() {
+        Ok(r) if !r.copied.is_empty() || !r.skipped.is_empty() => tracing::info!(
+            copied = r.copied.len(),
+            skipped = r.skipped.len(),
+            "biotek: copied the legacy pre-Biotek home into ~/.biotek (legacy home left in place)"
+        ),
+        Ok(_) => {}
+        Err(e) => tracing::warn!("biotek: data-home migration skipped: {e}"),
+    }
     kwin_pre_start(cfg.overlay.auto_fix_kwin);
     let manifest = preview::resolve(cli.manifest.clone())?;
     let seed = std::time::SystemTime::now()

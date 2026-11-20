@@ -2,6 +2,12 @@
 
 Branch: `quantumsec/phase1` → PR into `quantumsec/integration` (never `main`).
 
+> **Delivery status (verified 2026-11-15):** `quantumsec/phase1` @ `4835ab3` was merged into
+> `quantumsec/integration` (Lillith-Desktop-Avatar PR #10) and is in this distribution
+> repo's `main` (`7d4472b`). It is **not** on Lillith-Desktop-Avatar `main` (`1fcac41`);
+> the integration → `main` PR #16 there is still open. "Delivered" below means delivered on
+> those branches, not on desktop `main`. See `docs/HANDOVER.md` (top) for the evidence.
+
 ## Added
 
 | Piece | Location |

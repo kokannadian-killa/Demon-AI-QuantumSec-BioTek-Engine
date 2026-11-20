@@ -1,0 +1,15 @@
+# DemonOS PhantomCore: re-apply DemonOS branding after every pacman transaction.
+# Garuda's own hooks (garuda-hooks: 20-os-release, 20-lsb-release; garuda-config-agent)
+# rewrite os-release/lsb-release/grub defaults to "Garuda" whenever filesystem,
+# lsb-release or files in /etc change. This hook sorts after them (and after
+# zzz_post), so DemonOS wins. Garuda's repos/package layout are left untouched.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = *
+
+[Action]
+Description = Applying DemonOS PhantomCore branding (over the Garuda Dr460nized base)...
+When = PostTransaction
+Exec = /usr/bin/bash /usr/local/bin/demonos-rebrand

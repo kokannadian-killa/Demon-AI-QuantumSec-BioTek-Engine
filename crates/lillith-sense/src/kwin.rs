@@ -239,7 +239,7 @@ pub async fn serve(sink: Sink) -> zbus::Result<()> {
     Ok(())
 }
 
-/// Window categories (copied from `aether_gesture_map.py` app lists). TODO: full lists.
+/// Window categories (copied from `biotek_gesture_map.py` app lists). TODO: full lists.
 pub fn categorize(resource_class: &str) -> &'static str {
     let c = resource_class.to_ascii_lowercase();
     if ["dolphin", "nautilus", "thunar", "nemo"]
