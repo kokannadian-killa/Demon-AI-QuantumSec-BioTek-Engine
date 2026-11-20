@@ -32,7 +32,37 @@ log "2/4 [demonos-local] repo"
 mkdir -p "$REPO"
 id builder &>/dev/null || useradd -m -U builder
 if ! ls "$REPO"/lillith-0.0.1-1-*.pkg.tar.zst >/dev/null 2>&1; then
-  bash "$SRC/iso/garuda/repack-lillith-from-iso.sh" "$VERIFIED_ISO" "$REPO"
+  if [[ "${LILLITH_FROM:-auto}" != source && -f "$VERIFIED_ISO" ]]; then
+    bash "$SRC/iso/garuda/repack-lillith-from-iso.sh" "$VERIFIED_ISO" "$REPO"
+  else
+    # Fresh build from this checkout (linux/PKGBUILD, unmodified), e.g. when the
+    # source changed (2026-11-19 Biotek rename) or no verified ISO is on disk.
+    # Needs the Git LFS art checked out in assets/generated (PKGBUILD prepare()
+    # refuses pointer stubs). Build trees + the rust toolchain are removed again
+    # before mkarchiso so the disk is free for the airootfs.
+    log "2/4 lillith from source (no verified ISO to repack, or LILLITH_FROM=source)"
+    JOBS=${JOBS:-4}
+    pacman -S --noconfirm --needed base-devel rust pkgconf python \
+      gcc-libs glibc libxkbcommon wayland dbus libpulse systemd-libs alsa-lib openssl zlib zstd
+    rm -rf /var/cache/pacman/pkg/*.pkg.tar.* 2>/dev/null || true
+    install -d -o builder -g builder /build/makepkg /build/srcdest /build/logs /build/cargo-target /build/cargo-home
+    benv=(env -i HOME=/home/builder PATH=/usr/bin:/usr/local/bin LANG=C.UTF-8 SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH"
+          BUILDDIR=/build/makepkg PKGDEST="$REPO" SRCDEST=/build/srcdest LOGDEST=/build/logs
+          CARGO_TARGET_DIR=/build/cargo-target CARGO_HOME=/build/cargo-home
+          MAKEFLAGS="-j$JOBS" CARGO_BUILD_JOBS="$JOBS")
+    chown builder:builder "$REPO"
+    sudo -u builder "${benv[@]}" bash -c "cd '$SRC/linux' && makepkg -f -c --noconfirm --log"
+    if [[ "${RUN_TESTS:-1}" == 1 ]]; then
+      # workspace tests, release profile (reuses the release deps just built)
+      log "cargo test --release --workspace (log: /build/logs/cargo-test-release.log)"
+      if sudo -u builder "${benv[@]}" bash -c "cd '$SRC' && cargo test --release --locked --workspace --no-fail-fast -j $JOBS" \
+        > /build/logs/cargo-test-release.log 2>&1; then echo "cargo test: PASS"; else echo "cargo test: FAILURES (see log)"; fi
+      grep -E '^test result|FAILED|panicked' /build/logs/cargo-test-release.log | sort | uniq -c | sort -rn | head -20 || true
+    fi
+    rm -rf --one-file-system /build/cargo-target /build/cargo-home /build/makepkg /build/srcdest
+    pacman -Rns --noconfirm rust || true
+    rm -rf /var/cache/pacman/pkg/*.pkg.tar.* 2>/dev/null || true
+  fi
 fi
 cp -f /build/packages/lillith-llama-bin-*.pkg.tar.zst "$REPO/"
 rm -f "$REPO"/demonos-local.*
@@ -74,6 +104,21 @@ w.resize((640, 360), Image.LANCZOS).save(f"{l}/previews/preview.png")
 w.resize((1920, 1080)).save(f"{l}/previews/fullscreenpreview.jpg", quality=90)
 PY
 ls -la "$A/usr/share/icons/demonos" "$L/splash/images"
+# Calamares installer branding (DemonOS emblem + wallpaper)
+CB="$A/usr/share/calamares/branding/demonos"
+python3 - "$SRC" "$CB" "$T" <<'PY'
+import sys
+from PIL import Image
+src, cb, t = sys.argv[1:4]
+em = Image.open(f"{src}/branding/icons/demonos-emblem/icon-1024.png").convert("RGBA")
+em.resize((256, 256), Image.LANCZOS).save(f"{cb}/logo.png")
+w = Image.open(f"{t}/wallpaper/DemonOS/contents/images/1920x1080.png").convert("RGB")
+w.resize((800, 450), Image.LANCZOS).save(f"{cb}/slide1.png")
+welcome = w.resize((800, 450), Image.LANCZOS).convert("RGBA")
+e = em.resize((300, 300), Image.LANCZOS); welcome.alpha_composite(e, (250, 75))
+welcome.convert("RGB").save(f"{cb}/welcome.png")
+PY
+ls -la "$CB"
 
 log "4/4 mkarchiso ($(free_mb) MB free)"
 rm -rf --one-file-system /build/work

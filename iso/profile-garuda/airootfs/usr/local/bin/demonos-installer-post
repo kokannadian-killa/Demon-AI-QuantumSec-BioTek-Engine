@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# demonos-installer-post: run by Calamares (shellprocess@post) INSIDE the newly
+# copied system, before mkinitcpio + GRUB. It only undoes what exists for the
+# live medium (iso/profile-garuda/airootfs); every DemonOS / Lillith /
+# QuantumSec / Biotek file and Garuda package stays as it is.
+set -u
+log(){ echo "[demonos-installer-post] $*"; }
+
+# 1. live-medium-only units (archiso helpers; files from airootfs, not packages)
+for u in pacman-init.service choose-mirror.service livecd-talk.service \
+         livecd-alsa-unmuter.service etc-pacman.d-gnupg.mount; do
+  rm -f /etc/systemd/system/"$u" /etc/systemd/system/*.wants/"$u"
+done
+# 2. live-only config: passwordless sudo, volatile journal, no-suspend, archiso
+#    sshd drop-in (root login with an empty password), live-home tmpfiles, root's
+#    autostart script
+rm -f /etc/sudoers.d/10-demonos-live \
+      /etc/systemd/journald.conf.d/volatile-storage.conf \
+      /etc/systemd/logind.conf.d/do-not-suspend.conf \
+      /etc/ssh/sshd_config.d/10-archiso.conf \
+      /etc/tmpfiles.d/demonos-home.conf \
+      /root/.automated_script.sh /root/.zlogin
+printf 'DemonOS PhantomCore (Garuda Dr460nized base)\n' > /etc/motd
+# 3. SDDM: keep the DemonOS theme + Wayland settings, drop the live autologin
+#    of "demon" (removed by Calamares' removeuser before this runs)
+f=/etc/sddm.conf.d/10-demonos.conf
+if [[ -f $f ]]; then
+  awk 'BEGIN{s=0} /^\[/{s=($0=="[Autologin]")} !s' "$f" > "$f.new" && mv "$f.new" "$f"
+fi
+# 4. initramfs: the archiso hooks are for the live medium only
+rm -f /etc/mkinitcpio.conf.d/archiso.conf
+install -d /etc/mkinitcpio.conf.d
+cat > /etc/mkinitcpio.conf.d/10-demonos.conf <<'H'
+# DemonOS installed system (written by demonos-installer-post): Plymouth splash
+HOOKS=(base udev plymouth autodetect microcode modconf kms keyboard keymap consolefont block filesystems fsck)
+H
+# 5. the installer itself is not needed on the installed system
+rm -f /usr/share/applications/demonos-install.desktop /etc/skel/Desktop/demonos-install.desktop
+# 6. pacman keyring on disk (the live one was a tmpfs)
+if [[ ! -s /etc/pacman.d/gnupg/pubring.gpg && ! -s /etc/pacman.d/gnupg/pubring.kbx ]]; then
+  pacman-key --init && pacman-key --populate || log "pacman-key populate failed (run it after first boot)"
+fi
+# 7. no empty root password left behind
+if passwd -S root 2>/dev/null | awk '{exit !($2=="NP")}'; then passwd -l root; fi
+# 8. DemonOS branding wins (os-release, lsb-release, GRUB defaults)
+[[ -x /usr/local/bin/demonos-rebrand ]] && /usr/local/bin/demonos-rebrand || true
+log "done"
+exit 0

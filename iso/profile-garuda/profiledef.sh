@@ -31,4 +31,6 @@ file_permissions=(
   ["/usr/local/bin/demonos-awakening"]="0:0:755"
   ["/usr/local/bin/demonos-firstboot"]="0:0:755"
   ["/usr/local/bin/demonos-rebrand"]="0:0:755"
+  ["/usr/local/bin/demonos-install"]="0:0:755"
+  ["/usr/local/bin/demonos-installer-post"]="0:0:755"
 )

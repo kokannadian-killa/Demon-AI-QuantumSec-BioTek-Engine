@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Install DemonOS PhantomCore
+GenericName=System Installer
+Comment=Install DemonOS PhantomCore (Lillith + QuantumSec, Garuda Dr460nized base) to a disk
+Exec=/usr/local/bin/demonos-install
+Icon=demonos
+Terminal=false
+Categories=System;
+Keywords=installer;calamares;install;

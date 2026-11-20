@@ -6,7 +6,8 @@
 #     KERNEL-headers: kernel headers only needed for DKMS; dropped with broadcom-wl-dkms to fit the build disk
 #     broadcom-wl-dkms: DKMS build at image time needs headers; Broadcom firmware still ships in linux-firmware
 #     garuda-dracut-support: conflicts with mkinitcpio; the archiso live initramfs needs mkinitcpio-archiso
-#     calamares-garuda: configured for Garuda's own miso/garuda-tools live layout (multi-sfs), which this archiso ISO does not use
+#     calamares-garuda: NOW SHIPPED (2026-11-19, installable ISO). Garuda's Calamares build is used with DemonOS's own
+#       config for the archiso layout (/etc/calamares: unpackfs from demonos/x86_64/airootfs.sfs; see iso/garuda/README.md)
 #     calamares-branding-garuda: goes with calamares-garuda (Garuda branding); not shipped
 #     garuda-tools-base-git: garuda-tools live-session plumbing (miso); archiso provides the live boot instead
 #     garuda-live-systemd: garuda-tools live-session units; archiso live units are used instead
@@ -330,3 +331,5 @@ alsa-lib
 ollama
 lillith
 lillith-llama-bin
+# --- DemonOS installer (Calamares from [garuda]; config in airootfs/etc/calamares)
+calamares-garuda

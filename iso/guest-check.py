@@ -225,6 +225,46 @@ if GARUDA:
     print("SDDM THEME SCREENSHOT:", shot, flush=True)
     R["SDDM DemonOS theme renders (greeter test mode)"] = shot is not None and "sddm-greeter" in t and "--test-mode" in t
     run("close greeter", "pkill -u demon -f 'sddm-greeter'; true")
+# 2026-11-19 Biotek rename: no legacy (pre-Biotek) data home, unit or file name in
+# the live system, and the Biotek home is the one in use. The legacy literal is
+# built from parts so this checker itself never carries it as a plain word.
+LEG = "ae" + "ther"
+rc, t = run("no legacy pre-Biotek paths/units",
+            f"find / -xdev -iname '*{LEG}*' 2>/dev/null | head -20; "
+            f"systemctl list-unit-files --no-legend 2>/dev/null | grep -i {LEG}; "
+            f"{U} systemctl --user list-unit-files --no-legend 2>/dev/null | grep -i {LEG}; "
+            f"grep -ril {LEG} /etc/systemd /usr/lib/systemd /etc/skel /usr/local/bin /etc/calamares /usr/share/applications 2>/dev/null | head; "
+            f"ls -d /home/*/.{LEG} /root/.{LEG} 2>/dev/null; echo LEGACY_SCAN_DONE", 1200)
+R["no legacy pre-Biotek paths, units or files"] = "LEGACY_SCAN_DONE" in t and LEG not in t.replace("LEGACY_SCAN_DONE", "").lower().replace(f"-iname '*{LEG}*'", "")
+rc, t = run("Biotek home in use", f"ls -la /home/demon/.biotek/quantumsec 2>&1 | head -5; test -s {SJ} && echo BIOTEK_STATUS_OK")
+R["~/.biotek in use (quantumsec/status.json written there)"] = "BIOTEK_STATUS_OK" in t
+if GARUDA:
+    # Installable: Calamares + the DemonOS config for the archiso layout, and the
+    # files its unpackfs/copykernel steps read from the boot medium.
+    rc, t = run("installer present", "pacman -Q calamares-garuda; command -v calamares demonos-install demonos-installer-post; "
+                "ls /etc/calamares /etc/calamares/modules; ls /usr/share/calamares/branding/demonos; "
+                "test -f /run/archiso/bootmnt/demonos/x86_64/airootfs.sfs && echo SFS_OK; "
+                "test -f /run/archiso/bootmnt/demonos/boot/x86_64/vmlinuz-linux-garuda && echo KERNEL_OK; "
+                "grep -c . /usr/share/applications/demonos-install.desktop")
+    R["installer present (calamares + /etc/calamares + DemonOS branding)"] = ("calamares-garuda" in t and "/usr/bin/calamares" in t
+        and "settings.conf" in t and "branding.desc" in t and "logo.png" in t)
+    R["installer sources on the medium (airootfs.sfs + vmlinuz-linux-garuda)"] = "SFS_OK" in t and "KERNEL_OK" in t
+    # Launchable: start it on the live Wayland session as root (as the menu entry
+    # does through sudo), let it load every module, screenshot, close it. Nothing
+    # is installed: the summary page's Install button is never pressed.
+    rc, t = run("installer launches (calamares -d on the live session)",
+                "LP=$(pgrep -u demon -x lillith | head -1); W=$(tr '\\0' '\\n' </proc/$LP/environ | sed -n 's/^WAYLAND_DISPLAY=//p'); "
+                "rm -rf /root/.cache/calamares; "
+                "env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=$W QT_QPA_PLATFORM=wayland setsid -f calamares -d >/tmp/calamares.out 2>&1; "
+                "sleep 120; pgrep -a calamares; "
+                "L=$(ls /root/.cache/calamares/session.log 2>/dev/null || echo /tmp/calamares.out); "
+                "grep -ciE 'bad config|failed to load|could not load|module .* not found|Calamares will now quit' $L; "
+                "grep -E 'Loaded module|loaded successfully|STARTUP: all modules loaded|ViewManager' $L | tail -5; tail -5 $L", 300)
+    R["installer launches and stays up (calamares running)"] = re.search(r"^\s*\d+ calamares", t, re.M) is not None
+    shot = screendump("shot-installer.png")
+    print("INSTALLER SCREENSHOT:", shot, flush=True)
+    R["installer screenshot taken"] = shot is not None
+    run("close installer", "pkill -x calamares; sleep 3; true")
 run("listening sockets before model", "ss -Hltnp")
 run("start llama-server on 127.0.0.1", f"{U} sh -c 'nohup /opt/llama/llama-server -m {MODEL} --host 127.0.0.1 --port 8080 -c 512 -t 2 --jinja >/tmp/llama.log 2>&1 &'; sleep 2; pgrep -a llama-server")
 rc, t = run("wait for /health", "for i in $(seq 1 120); do curl -sf http://127.0.0.1:8080/health && break; sleep 10; done; echo; tail -5 /tmp/llama.log", 1500)

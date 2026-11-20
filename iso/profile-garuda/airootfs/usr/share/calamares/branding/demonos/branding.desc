@@ -1,0 +1,32 @@
+# DemonOS PhantomCore Calamares branding. Images are generated at build time by
+# iso/garuda/chroot-build-garuda.sh (DemonOS emblem + wallpaper).
+---
+componentName:  demonos
+welcomeStyleCalamares:   false
+welcomeExpandingLogo:   true
+windowExpanding:    normal
+windowSize: 1024px,640px
+windowPlacement: center
+sidebar: widget
+navigation: widget
+strings:
+    productName:         "DemonOS PhantomCore"
+    shortProductName:    "DemonOS"
+    version:             "PhantomCore"
+    shortVersion:        "PhantomCore"
+    versionedName:       "DemonOS PhantomCore"
+    shortVersionedName:  "DemonOS"
+    bootloaderEntryName: "DemonOS"
+    productUrl:          "https://github.com/kokannadian-killa/Demon-AI-QuantumSec-BioTek-Engine"
+    supportUrl:          "https://github.com/kokannadian-killa/Demon-AI-QuantumSec-BioTek-Engine/issues"
+    knownIssuesUrl:      "https://github.com/kokannadian-killa/Demon-AI-QuantumSec-BioTek-Engine/blob/main/iso/README.md"
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+slideshow:               [ "slide1.png" ]
+style:
+   SidebarBackground:        "#120810"
+   SidebarText:              "#f8eef4"
+   SidebarTextCurrent:       "#5fd0e6"
+   SidebarBackgroundCurrent: "#2a0f22"
