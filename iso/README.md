@@ -269,3 +269,4 @@ exclusions, the trademark replacement table, licenses and the build history are 
   repackages the pinned upstream Ubuntu build, which runs fine on Arch: it needs
   glibc, libstdc++, libgomp, openssl, zlib and zstd.
 * The ISO is unsigned, and Secure Boot isn't supported, the same as releng.
+  Signing plan and open decisions: [`docs/ISO_SIGNING.md`](../docs/ISO_SIGNING.md).
