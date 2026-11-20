@@ -216,6 +216,140 @@ pub const ENGINE_WS_PORT: u16 = 8765;
 /// Upstream Prometheus port (documented upstream).
 pub const ENGINE_METRICS_PORT: u16 = 9090;
 
+// ---------------------------------------------------------------------------
+// Engine listener ports on this machine (host side), loopback only.
+//
+// Upstream binds its three listeners on `0.0.0.0` with fixed ports and has
+// no host/port flag. Two of them clash with Lillith's own loopback services:
+// the static GUI `:8080` with llama-server (`detect::DEFAULT_LLAMA_SERVER_URL`)
+// and the WebSocket `:8765` with `lillith-py-api.service` (`[sidecar] port`).
+// Lillith's services keep their ports; the engine is published on other
+// loopback ports instead (container `-p 127.0.0.1:<host>:<engine>`, or a
+// `systemd-socket-proxyd` in front of a `PrivateNetwork=yes` unit). See
+// `docs/BIOTEK_TERMINOLOGY_MAP.md` §8. No engine is bundled or launched yet;
+// this is the contract a future launcher must use.
+// ---------------------------------------------------------------------------
+
+/// The only host the engine's listeners may be published on.
+pub const ENGINE_BIND_HOST: &str = "127.0.0.1";
+/// llama-server default port (Lillith's local model; `127.0.0.1:8080`).
+pub const LILLITH_LLAMA_PORT: u16 = 8080;
+/// `lillith-py-api.service` default port (`[sidecar] port`, loopback only).
+pub const LILLITH_PY_API_PORT: u16 = 8765;
+/// Ollama default port (shared with the engine's own Ollama client).
+pub const OLLAMA_PORT: u16 = 11434;
+/// Loopback ports already used by Lillith; the engine must not take them.
+pub const RESERVED_LOCAL_PORTS: &[u16] = &[LILLITH_LLAMA_PORT, LILLITH_PY_API_PORT, OLLAMA_PORT];
+/// Default host-side port for the engine GUI (engine side stays 8080).
+pub const ENGINE_GUI_HOST_PORT: u16 = 18080;
+/// Default host-side port for the engine WebSocket (engine side stays 8765).
+pub const ENGINE_WS_HOST_PORT: u16 = 18765;
+/// Default host-side port for engine metrics (no clash; same as upstream).
+pub const ENGINE_METRICS_HOST_PORT: u16 = ENGINE_METRICS_PORT;
+/// Override for [`ENGINE_GUI_HOST_PORT`].
+pub const ENGINE_GUI_PORT_ENV: &str = "BIOTEK_ENGINE_GUI_PORT";
+/// Override for [`ENGINE_WS_HOST_PORT`].
+pub const ENGINE_WS_PORT_ENV: &str = "BIOTEK_ENGINE_WS_PORT";
+/// Override for [`ENGINE_METRICS_HOST_PORT`].
+pub const ENGINE_METRICS_PORT_ENV: &str = "BIOTEK_ENGINE_METRICS_PORT";
+
+/// Host-side loopback ports for the engine's GUI, WebSocket and metrics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnginePorts {
+    pub gui: u16,
+    pub ws: u16,
+    pub metrics: u16,
+}
+
+impl Default for EnginePorts {
+    fn default() -> Self {
+        Self {
+            gui: ENGINE_GUI_HOST_PORT,
+            ws: ENGINE_WS_HOST_PORT,
+            metrics: ENGINE_METRICS_HOST_PORT,
+        }
+    }
+}
+
+impl EnginePorts {
+    /// `(host port, engine port)` pairs.
+    pub fn mappings(&self) -> [(u16, u16); 3] {
+        [
+            (self.gui, ENGINE_GUI_PORT),
+            (self.ws, ENGINE_WS_PORT),
+            (self.metrics, ENGINE_METRICS_PORT),
+        ]
+    }
+
+    /// Container publish args, loopback only:
+    /// `-p 127.0.0.1:18080:8080 -p 127.0.0.1:18765:8765 -p 127.0.0.1:9090:9090`.
+    pub fn publish_args(&self) -> Vec<String> {
+        self.mappings()
+            .iter()
+            .flat_map(|(h, e)| ["-p".to_string(), format!("{ENGINE_BIND_HOST}:{h}:{e}")])
+            .collect()
+    }
+
+    /// Loopback URLs the desktop side would read (`http://127.0.0.1:18080`, …).
+    pub fn gui_url(&self) -> String {
+        format!("http://{ENGINE_BIND_HOST}:{}", self.gui)
+    }
+    pub fn ws_url(&self) -> String {
+        format!("ws://{ENGINE_BIND_HOST}:{}", self.ws)
+    }
+    pub fn metrics_url(&self) -> String {
+        format!("http://{ENGINE_BIND_HOST}:{}/metrics", self.metrics)
+    }
+}
+
+fn parse_port(name: &str, v: Option<&str>, default: u16) -> Result<u16, String> {
+    match v.map(str::trim).filter(|v| !v.is_empty()) {
+        None => Ok(default),
+        Some(v) => match v.parse::<u16>() {
+            Ok(0) | Err(_) => Err(format!("{name}={v:?} is not a port (1-65535)")),
+            Ok(p) => Ok(p),
+        },
+    }
+}
+
+/// The host-port rule from explicit values (testable without env). Refuses
+/// ports Lillith already uses ([`RESERVED_LOCAL_PORTS`]) and duplicates.
+pub fn engine_ports_from(
+    gui: Option<&str>,
+    ws: Option<&str>,
+    metrics: Option<&str>,
+) -> Result<EnginePorts, String> {
+    let p = EnginePorts {
+        gui: parse_port(ENGINE_GUI_PORT_ENV, gui, ENGINE_GUI_HOST_PORT)?,
+        ws: parse_port(ENGINE_WS_PORT_ENV, ws, ENGINE_WS_HOST_PORT)?,
+        metrics: parse_port(ENGINE_METRICS_PORT_ENV, metrics, ENGINE_METRICS_HOST_PORT)?,
+    };
+    for (name, port) in [
+        (ENGINE_GUI_PORT_ENV, p.gui),
+        (ENGINE_WS_PORT_ENV, p.ws),
+        (ENGINE_METRICS_PORT_ENV, p.metrics),
+    ] {
+        if RESERVED_LOCAL_PORTS.contains(&port) {
+            return Err(format!(
+                "{name}={port} clashes with a Lillith service (8080 llama-server, \
+                 8765 lillith-py-api, 11434 Ollama)"
+            ));
+        }
+    }
+    if p.gui == p.ws || p.gui == p.metrics || p.ws == p.metrics {
+        return Err(format!("engine ports must differ: {p:?}"));
+    }
+    Ok(p)
+}
+
+/// [`engine_ports_from`] with `$BIOTEK_ENGINE_{GUI,WS,METRICS}_PORT`.
+pub fn engine_ports() -> Result<EnginePorts, String> {
+    let g = std::env::var(ENGINE_GUI_PORT_ENV).ok();
+    let w = std::env::var(ENGINE_WS_PORT_ENV).ok();
+    let m = std::env::var(ENGINE_METRICS_PORT_ENV).ok();
+    engine_ports_from(g.as_deref(), w.as_deref(), m.as_deref())
+}
+
 /// Resolved upstream engine paths.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnginePaths {
@@ -412,5 +546,66 @@ mod tests {
         assert_eq!(engine_paths_from(Some("/b".into()), None, None, None), None);
         assert_eq!(ENGINE_UNIT, "biotekengine.service");
         assert!(ENGINE_METRICS_PREFIX.starts_with(ENGINE_BIN));
+    }
+
+    #[test]
+    fn engine_ports_default_no_clash_loopback_only() {
+        let p = engine_ports_from(None, None, None).unwrap();
+        assert_eq!(p, EnginePorts::default());
+        assert_eq!((p.gui, p.ws, p.metrics), (18080, 18765, 9090));
+        for (h, _) in p.mappings() {
+            assert!(!RESERVED_LOCAL_PORTS.contains(&h), "{h}");
+        }
+        // The clashes this resolves are real.
+        assert_eq!(ENGINE_GUI_PORT, LILLITH_LLAMA_PORT);
+        assert_eq!(ENGINE_WS_PORT, LILLITH_PY_API_PORT);
+        assert!(crate::detect::DEFAULT_LLAMA_SERVER_URL.ends_with(":8080"));
+        let py = include_str!("../../../tools/lillith-py/lillith_py/lillith_config.py");
+        assert!(
+            py.contains("DEFAULT_PORT = 8765"),
+            "lillith-py default moved"
+        );
+        // Every publish arg is loopback; nothing is 0.0.0.0 / ::.
+        let a = p.publish_args();
+        assert_eq!(
+            a,
+            [
+                "-p",
+                "127.0.0.1:18080:8080",
+                "-p",
+                "127.0.0.1:18765:8765",
+                "-p",
+                "127.0.0.1:9090:9090"
+            ]
+        );
+        for x in &a {
+            assert!(!x.contains("0.0.0.0") && !x.contains("::"), "{x}");
+        }
+        assert_eq!(p.gui_url(), "http://127.0.0.1:18080");
+        assert_eq!(p.ws_url(), "ws://127.0.0.1:18765");
+        assert_eq!(p.metrics_url(), "http://127.0.0.1:9090/metrics");
+    }
+
+    #[test]
+    fn engine_ports_overrides_and_refusals() {
+        let p = engine_ports_from(Some("28080"), Some(" 28765 "), Some("29090")).unwrap();
+        assert_eq!((p.gui, p.ws, p.metrics), (28080, 28765, 29090));
+        assert_eq!(engine_ports_from(Some(""), None, None).unwrap().gui, 18080);
+        for bad in ["8080", "8765", "11434", "0", "x", "70000", "-1"] {
+            assert!(
+                engine_ports_from(Some(bad), None, None).is_err(),
+                "gui {bad}"
+            );
+            assert!(
+                engine_ports_from(None, Some(bad), None).is_err(),
+                "ws {bad}"
+            );
+            assert!(
+                engine_ports_from(None, None, Some(bad)).is_err(),
+                "metrics {bad}"
+            );
+        }
+        assert!(engine_ports_from(Some("9090"), None, None).is_err());
+        assert!(engine_ports_from(None, Some("18080"), None).is_err());
     }
 }

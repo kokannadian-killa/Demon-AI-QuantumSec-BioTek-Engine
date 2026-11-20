@@ -218,6 +218,10 @@ pub fn default_scan_dirs_with(bundled: &[PathBuf]) -> Vec<PathBuf> {
         ] {
             v.push(h.join(d));
         }
+        // Upstream Biotek Engine model registry (`~/.biotekengine/models`),
+        // so GGUFs placed for the engine show up here too. Additive: every
+        // path above is still scanned, in the same order.
+        v.push(h.join(crate::biotek::ENGINE_DOT_DIR).join("models"));
     }
     if let Some(c) = paths::cache_home() {
         v.push(c.join("llama.cpp"));
@@ -1055,6 +1059,52 @@ mod tests {
         assert_eq!(f.chat_template, ChatTemplate::ChatMl);
         assert!(r.models.iter().any(|m| m.source == ModelSource::OllamaBlob));
         assert!(!r.dirs[1].exists);
+    }
+
+    #[test]
+    fn biotekengine_models_dir_is_scanned_additively() {
+        let Some(home) = paths::home_dir() else {
+            return;
+        };
+        let dirs = default_scan_dirs_with(&[]);
+        let engine = home.join(".biotekengine/models");
+        assert!(dirs.contains(&engine), "{dirs:#?}");
+        // It matches the engine resolver's models dir.
+        if let Some(e) = crate::biotek::engine_paths() {
+            assert_eq!(e.models_dir, engine);
+        }
+        // The older home paths are all still there, ahead of it.
+        let pos = |p: &Path| dirs.iter().position(|d| d == p);
+        let engine_at = pos(&engine).unwrap();
+        for d in [
+            "AI/models",
+            "models",
+            ".cache/llama.cpp",
+            ".ollama/models/blobs",
+            ".lmstudio/models",
+            "Downloads",
+        ] {
+            let at = pos(&home.join(d)).unwrap_or_else(|| panic!("{d} dropped"));
+            assert!(at < engine_at, "{d} should stay ahead of the engine dir");
+        }
+        assert_eq!(dirs.first(), Some(&home.join("AI/models")));
+        // A GGUF there is found by a scan.
+        let root =
+            std::env::temp_dir().join(format!("lillith-setup-biotekengine-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let models = root.join(".biotekengine/models");
+        std::fs::create_dir_all(&models).unwrap();
+        let mut g = build_gguf(&[("general.architecture", TestVal::Str("llama"))]);
+        g.resize(2048, 0);
+        std::fs::write(models.join("engine-model-q4_k_m.gguf"), &g).unwrap();
+        let r = scan(&ScanOptions {
+            dirs: vec![models],
+            max_depth: 4,
+            include_ollama_blobs: false,
+            min_size_bytes: 1,
+        });
+        std::fs::remove_dir_all(&root).ok();
+        assert_eq!(r.models.len(), 1, "{r:#?}");
     }
 
     #[test]
